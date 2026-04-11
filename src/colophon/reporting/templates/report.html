@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Colophon Analysis: {{ title }}</title>
+    <style>
+        :root {
+            --bg: #1a1a2e;
+            --surface: #16213e;
+            --surface2: #0f3460;
+            --text: #e4e4e4;
+            --text-dim: #a0a0a0;
+            --accent: #e94560;
+            --accent2: #533483;
+            --green: #4ecca3;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        header {
+            text-align: center;
+            padding: 3rem 0 2rem;
+            border-bottom: 1px solid var(--surface2);
+            margin-bottom: 2rem;
+        }
+        header h1 { font-size: 2rem; margin-bottom: 0.5rem; }
+        header .meta { color: var(--text-dim); font-size: 0.9rem; }
+        .stats-bar {
+            display: flex;
+            justify-content: center;
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+        .stat { text-align: center; }
+        .stat .value { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+        .stat .label { font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.1em; }
+        section {
+            background: var(--surface);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+        section h2 {
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+            color: var(--green);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .chart { width: 100%; min-height: 350px; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        @media (max-width: 768px) { .grid-2 { grid-template-columns: 1fr; } }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.9rem;
+        }
+        th, td {
+            padding: 0.5rem 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--surface2);
+        }
+        th { color: var(--text-dim); font-weight: 500; font-size: 0.8rem; text-transform: uppercase; }
+        td:nth-child(2) { text-align: right; font-variant-numeric: tabular-nums; }
+        footer {
+            text-align: center;
+            padding: 2rem 0;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>{{ title }}</h1>
+            <div class="meta">Colophon Stylometric Analysis</div>
+            <div class="stats-bar">
+                <div class="stat">
+                    <div class="value">{{ "{:,}".format(word_count) }}</div>
+                    <div class="label">Words</div>
+                </div>
+                {% if readability %}
+                <div class="stat">
+                    <div class="value">{{ "%.1f"|format(readability.flesch_reading_ease) }}</div>
+                    <div class="label">Flesch Score</div>
+                </div>
+                <div class="stat">
+                    <div class="value">{{ "%.1f"|format(readability.flesch_kincaid_grade) }}</div>
+                    <div class="label">Grade Level</div>
+                </div>
+                {% endif %}
+                {% if sentences %}
+                <div class="stat">
+                    <div class="value">{{ "%.1f"|format(sentences.mean_length) }}</div>
+                    <div class="label">Avg Sentence</div>
+                </div>
+                {% endif %}
+                {% if vocabulary %}
+                <div class="stat">
+                    <div class="value">{{ "{:,}".format(vocabulary.unique_types) }}</div>
+                    <div class="label">Unique Words</div>
+                </div>
+                {% endif %}
+            </div>
+        </header>
+
+        {% if readability_chart %}
+        <section>
+            <h2>Readability Profile</h2>
+            <div class="chart">{{ readability_chart }}</div>
+        </section>
+        {% endif %}
+
+        {% if sentence_chart %}
+        <section>
+            <h2>Sentence Length Distribution</h2>
+            <div class="chart">{{ sentence_chart }}</div>
+        </section>
+        {% endif %}
+
+        <div class="grid-2">
+            {% if vocabulary %}
+            <section>
+                <h2>Vocabulary Richness</h2>
+                <table>
+                    <tr><td>Total tokens</td><td>{{ "{:,}".format(vocabulary.total_tokens) }}</td></tr>
+                    <tr><td>Unique types</td><td>{{ "{:,}".format(vocabulary.unique_types) }}</td></tr>
+                    <tr><td>Type-token ratio</td><td>{{ "%.4f"|format(vocabulary.ttr) }}</td></tr>
+                    <tr><td>Hapax legomena</td><td>{{ "{:,}".format(vocabulary.hapax_legomena) }} ({{ "%.1f"|format(vocabulary.hapax_ratio * 100) }}%)</td></tr>
+                    <tr><td>Yule's K</td><td>{{ "%.2f"|format(vocabulary.yules_k) }}</td></tr>
+                    {% if vocabulary.honores_r is not none %}
+                    <tr><td>Honore's R</td><td>{{ "%.2f"|format(vocabulary.honores_r) }}</td></tr>
+                    {% endif %}
+                </table>
+            </section>
+            {% endif %}
+
+            {% if punctuation %}
+            <section>
+                <h2>Punctuation Patterns</h2>
+                <div class="chart">{{ punctuation_chart }}</div>
+            </section>
+            {% endif %}
+        </div>
+
+        {% if function_word_chart %}
+        <section>
+            <h2>Function Word Frequencies</h2>
+            <div class="chart">{{ function_word_chart }}</div>
+        </section>
+        {% endif %}
+
+        {% if pos_chart %}
+        <section>
+            <h2>Part-of-Speech Distribution</h2>
+            <div class="chart">{{ pos_chart }}</div>
+        </section>
+        {% endif %}
+
+        {% if ngrams %}
+        <section>
+            <h2>Top Word Bigrams</h2>
+            <table>
+                <thead><tr><th>Bigram</th><th>Count</th></tr></thead>
+                <tbody>
+                {% for bigram, count in ngram_items %}
+                <tr><td>{{ bigram }}</td><td>{{ "{:,}".format(count) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </section>
+        {% endif %}
+
+        <footer>
+            Generated by Colophon v{{ version }} | {{ computed_at }}
+        </footer>
+    </div>
+</body>
+</html>

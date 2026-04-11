@@ -1,0 +1,23 @@
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.venv/
+.eggs/
+*.egg
+.ruff_cache/
+.pytest_cache/
+.pyright/
+*.analysis.json
+*.colophon.json
+*.restyled.md
+/report.html
+*.report.html
+assets/
+
+# OpenMemory - IDE/Assistant specific rules
+.windsurf/rules/openmemory.md
+CLAUDE.md
