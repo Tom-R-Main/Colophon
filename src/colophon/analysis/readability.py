@@ -5,11 +5,11 @@ from __future__ import annotations
 from colophon.models.features import ReadabilityFeatures
 
 
-def compute_readability(text: str) -> ReadabilityFeatures:
+def compute_readability(text: str, *, lang: str | None = "en") -> ReadabilityFeatures:
     """Compute readability scores for a text."""
     import textstat
 
-    textstat.set_lang("en")
+    textstat.set_lang(lang or "en")
 
     # SMOG requires 30+ sentences
     sentence_count = textstat.sentence_count(text)

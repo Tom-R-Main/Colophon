@@ -8,8 +8,11 @@ from typing import Any
 from colophon.models.features import DialogueFeatures
 
 
-def compute_dialogue(text: str, nlp: Any) -> DialogueFeatures:
+def compute_dialogue(
+    text: str, nlp: Any, quote_marks: list[str] | None = None,
+) -> DialogueFeatures:
     """Analyze dialogue patterns: quote ratio and attribution verbs."""
+    qmarks = set(quote_marks) if quote_marks else {'"'}
     doc = nlp(text)
 
     in_quote = False
@@ -17,7 +20,7 @@ def compute_dialogue(text: str, nlp: Any) -> DialogueFeatures:
     narration_words = 0
 
     for token in doc:
-        if token.text == '"':
+        if token.text in qmarks:
             in_quote = not in_quote
             continue
         if token.is_space or token.is_punct:
@@ -34,7 +37,7 @@ def compute_dialogue(text: str, nlp: Any) -> DialogueFeatures:
     # Find attribution verbs near quote boundaries
     attribution_verbs: Counter[str] = Counter()
     for i, token in enumerate(doc):
-        if token.text != '"':
+        if token.text not in qmarks:
             continue
         # Look in a 5-token window around each quote mark
         start = max(0, i - 5)

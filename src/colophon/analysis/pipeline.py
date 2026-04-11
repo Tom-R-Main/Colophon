@@ -38,14 +38,24 @@ def analyze(
     *,
     analyzers: list[str] | None = None,
     spacy_model: str = "en_core_web_sm",
+    lang: str = "en",
 ) -> StyleProfile:
     """Run the analysis pipeline on a document."""
+    from colophon.lang import get_profile
+    lang_profile = get_profile(lang)
+
     active = analyzers or list(ANALYZERS.keys())
+
+    # Skip readability if the language doesn't support it
+    if lang_profile.textstat_code is None and "readability" in active:
+        active = [a for a in active if a != "readability"]
+
     needs_spacy = any(a in SPACY_ANALYZERS for a in active)
 
     nlp: Any = None
     if needs_spacy:
-        nlp = load_spacy_model(spacy_model)
+        model = spacy_model if spacy_model != "en_core_web_sm" else lang_profile.spacy_model
+        nlp = load_spacy_model(model)
         nlp.max_length = len(doc.text) + 1000
 
     profile = StyleProfile(
@@ -63,18 +73,19 @@ def analyze(
             if name not in ANALYZERS:
                 continue
             progress.add_task(f"Running {name}...", total=None)
-            result = _run_analyzer(name, doc.text, nlp)
+            result = _run_analyzer(name, doc.text, nlp, lang_profile)
             if result is not None:
                 profile = profile.model_copy(update={name: result})
 
     return profile
 
 
-def _run_analyzer(name: str, text: str, nlp: Any) -> Any:
+def _run_analyzer(name: str, text: str, nlp: Any, lang_profile: Any = None) -> Any:
     """Run a single analyzer by name."""
     if name == "readability":
         from colophon.analysis.readability import compute_readability
-        return compute_readability(text)
+        textstat_code = lang_profile.textstat_code if lang_profile else "en"
+        return compute_readability(text, lang=textstat_code)
     elif name == "sentences":
         from colophon.analysis.sentence import compute_sentence_stats
         return compute_sentence_stats(text, nlp)
@@ -83,7 +94,8 @@ def _run_analyzer(name: str, text: str, nlp: Any) -> Any:
         return compute_vocabulary(text, nlp)
     elif name == "function_words":
         from colophon.analysis.function_words import compute_function_words
-        return compute_function_words(text, nlp)
+        word_list = lang_profile.function_words if lang_profile else None
+        return compute_function_words(text, nlp, function_word_list=word_list)
     elif name == "pos":
         from colophon.analysis.pos import compute_pos
         return compute_pos(text, nlp)
@@ -96,7 +108,8 @@ def _run_analyzer(name: str, text: str, nlp: Any) -> Any:
         return compute_punctuation(text, word_count)
     elif name == "contractions":
         from colophon.analysis.contractions import compute_contractions
-        return compute_contractions(text, nlp)
+        suffixes = lang_profile.contraction_suffixes if lang_profile else None
+        return compute_contractions(text, nlp, contraction_suffixes=suffixes)
     elif name == "sentence_openers":
         from colophon.analysis.openers import compute_openers
         return compute_openers(text, nlp)
@@ -105,7 +118,8 @@ def _run_analyzer(name: str, text: str, nlp: Any) -> Any:
         return compute_paragraphs(text, nlp)
     elif name == "dialogue":
         from colophon.analysis.dialogue import compute_dialogue
-        return compute_dialogue(text, nlp)
+        quote_marks = lang_profile.quote_marks if lang_profile else None
+        return compute_dialogue(text, nlp, quote_marks=quote_marks)
     elif name == "syntax":
         from colophon.analysis.syntax import compute_syntax
         return compute_syntax(text, nlp)

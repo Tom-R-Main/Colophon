@@ -22,8 +22,12 @@ FUNCTION_WORDS = [
 ]
 
 
-def compute_function_words(text: str, nlp: Any, top_n: int = 30) -> FunctionWordFeatures:
+def compute_function_words(
+    text: str, nlp: Any, top_n: int = 30, function_word_list: list[str] | None = None,
+) -> FunctionWordFeatures:
     """Compute function word frequencies normalized per 1000 words."""
+    word_list = function_word_list or FUNCTION_WORDS
+
     doc = nlp(text)
     tokens = [t.lower_ for t in doc if not t.is_space]
     total = len(tokens)
@@ -34,7 +38,7 @@ def compute_function_words(text: str, nlp: Any, top_n: int = 30) -> FunctionWord
     token_counts = Counter(tokens)
     freqs = {
         w: round((token_counts.get(w, 0) / total) * 1000, 2)
-        for w in FUNCTION_WORDS
+        for w in word_list
         if token_counts.get(w, 0) > 0
     }
 

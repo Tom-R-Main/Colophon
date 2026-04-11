@@ -5,11 +5,19 @@ from __future__ import annotations
 from colophon.models.features import StyleProfile
 
 
-def build_style_prompt(profile: StyleProfile) -> str:
+def build_style_prompt(
+    profile: StyleProfile,
+    *,
+    examples: list[str] | None = None,
+    fingerprint_diff: str | None = None,
+) -> str:
     """Convert a StyleProfile into a detailed system prompt for style transfer."""
     sections: list[str] = []
 
     sections.append(_role_section(profile))
+    if examples:
+        from colophon.stylize.examples import format_examples_prompt
+        sections.append(format_examples_prompt(examples))
     sections.append(_voice_section(profile))
     sections.append(_sentence_section(profile))
     sections.append(_vocabulary_section(profile))
@@ -21,6 +29,8 @@ def build_style_prompt(profile: StyleProfile) -> str:
     sections.append(_paragraph_section(profile))
     sections.append(_dialogue_section(profile))
     sections.append(_syntax_section(profile))
+    if fingerprint_diff:
+        sections.append(fingerprint_diff)
     sections.append(_rules_section())
 
     return "\n\n".join(s for s in sections if s)

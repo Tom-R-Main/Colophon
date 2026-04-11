@@ -47,6 +47,7 @@ def analyze(
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for analysis JSON."),
     analyzers: Optional[str] = typer.Option(None, "--analyzers", help="Comma-separated list of analyzers to run."),
     model: str = typer.Option("en_core_web_sm", "--model", help="spaCy model to use."),
+    lang: str = typer.Option("en", "--lang", help="Language code (en, fr, de, es, it, nl, pl, ru, ja, ko, zh, ...)."),
 ) -> None:
     """Run stylometric analysis on a document."""
     from colophon.analysis.pipeline import analyze as do_analyze
@@ -64,7 +65,7 @@ def analyze(
         doc = do_ingest(path)
 
     analyzer_list = analyzers.split(",") if analyzers else None
-    profile = do_analyze(doc, analyzers=analyzer_list, spacy_model=model)
+    profile = do_analyze(doc, analyzers=analyzer_list, spacy_model=model, lang=lang)
 
     out_path = output or path.with_suffix(".analysis.json")
     out_path.write_text(profile.model_dump_json(indent=2))
@@ -126,9 +127,15 @@ def stylize(
     article: Path = typer.Argument(..., help="Path to the article to restyle (TXT, MD, PDF)."),
     style: Path = typer.Argument(..., help="Path to an .analysis.json (the target style)."),
     output: Optional[Path] = typer.Option(None, "--output", "-o", help="Output path for the restyled article."),
-    llm_model: str = typer.Option(
-        "claude-sonnet-4-20250514", "--llm-model", help="Anthropic model to use."
+    source: Optional[Path] = typer.Option(
+        None, "--source", "-s", help="Path to source .colophon.json for few-shot examples."
     ),
+    provider: Optional[str] = typer.Option(
+        None, "--provider", help="LLM provider: anthropic, openai, gemini, openrouter."
+    ),
+    llm_model: Optional[str] = typer.Option(None, "--llm-model", help="Model name (auto-detected if omitted)."),
+    no_examples: bool = typer.Option(False, "--no-examples", help="Skip few-shot examples from source text."),
+    no_diff: bool = typer.Option(False, "--no-diff", help="Skip fingerprint diff analysis."),
     show_prompt: bool = typer.Option(False, "--show-prompt", help="Print the generated system prompt and exit."),
 ) -> None:
     """Rewrite an article in a target author's style using AI."""
@@ -144,11 +151,6 @@ def stylize(
 
     # Load the style profile
     profile = StyleProfile.model_validate_json(style.read_text())
-    system_prompt = build_style_prompt(profile)
-
-    if show_prompt:
-        console.print(system_prompt)
-        raise typer.Exit(0)
 
     # Load the article text
     if article.suffix == ".json":
@@ -162,12 +164,47 @@ def stylize(
     else:
         article_text = article.read_text(encoding="utf-8")
 
+    # Few-shot examples from source text
+    examples: list[str] | None = None
+    if not no_examples and source and source.exists():
+        from colophon.models.document import Document
+        from colophon.stylize.examples import select_examples
+        source_doc = Document.model_validate_json(source.read_text())
+        examples = select_examples(source_doc, profile)
+        if examples:
+            console.print(f"[dim]Selected {len(examples)} example passages from source text[/dim]")
+
+    # Fingerprint diff
+    fingerprint_diff: str | None = None
+    if not no_diff:
+        try:
+            from colophon.analysis.pipeline import analyze as do_analyze
+            from colophon.models.document import Document
+            from colophon.stylize.diff import compute_fingerprint_diff
+            input_doc = Document.from_text(text=article_text, source_path=str(article))
+            input_profile = do_analyze(input_doc, analyzers=["sentences", "contractions", "paragraphs",
+                                                              "punctuation", "sentence_openers", "dialogue"])
+            fingerprint_diff = compute_fingerprint_diff(input_profile, profile)
+            if fingerprint_diff:
+                console.print("[dim]Computed style delta between input and target[/dim]")
+        except Exception:
+            pass  # Fingerprint diff is best-effort
+
+    system_prompt = build_style_prompt(profile, examples=examples, fingerprint_diff=fingerprint_diff)
+
+    if show_prompt:
+        console.print(system_prompt)
+        raise typer.Exit(0)
+
     console.print(f"[bold]Style:[/bold] {profile.document_title}")
     console.print(f"[bold]Article:[/bold] {article.name} ({len(article_text.split()):,} words)")
-    console.print("[dim]Sending to Claude...[/dim]")
 
     from colophon.stylize.llm import stylize_text
-    result = stylize_text(system_prompt, article_text, model=llm_model)
+    from colophon.stylize.providers import get_provider
+    llm = get_provider(provider, model=llm_model)
+    console.print(f"[dim]Sending to {llm.name} ({llm.model})...[/dim]")
+
+    result = stylize_text(system_prompt, article_text, provider=provider, model=llm_model)
 
     out_path = output or article.with_suffix(".restyled.md")
     out_path.write_text(result)
