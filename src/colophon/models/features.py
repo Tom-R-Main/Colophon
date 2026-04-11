@@ -82,6 +82,52 @@ class PunctuationFeatures(BaseModel):
     quotation: float = 0.0
 
 
+class ContractionFeatures(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    total: int
+    rate_per_1000: float
+    top_contractions: dict[str, int] = Field(default_factory=dict, description="Contraction -> count.")
+
+
+class SentenceOpenerFeatures(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    top_words: dict[str, int] = Field(default_factory=dict, description="Opener word -> count.")
+    pos_distribution: dict[str, float] = Field(default_factory=dict, description="Opener POS -> proportion.")
+    conjunction_start_rate: float = Field(description="% of sentences starting with CCONJ (But, And, So).")
+
+
+class ParagraphFeatures(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    count: int
+    mean_length: float = Field(description="Words per paragraph.")
+    median_length: float
+    one_sentence_ratio: float = Field(description="% of paragraphs that are a single sentence.")
+    top_openers: dict[str, int] = Field(default_factory=dict, description="Paragraph-initial word -> count.")
+
+
+class DialogueFeatures(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    quoted_word_ratio: float = Field(description="% of words that are inside quotes.")
+    narration_word_ratio: float
+    top_attribution_verbs: dict[str, int] = Field(default_factory=dict, description="Attribution verb -> count.")
+
+
+class SyntaxFeatures(BaseModel):
+    model_config = ConfigDict(frozen=True)
+
+    mean_tree_depth: float = Field(description="Mean dependency tree depth per sentence.")
+    median_tree_depth: float
+    stdev_tree_depth: float
+    tense_distribution: dict[str, float] = Field(default_factory=dict, description="Tense -> proportion of verbs.")
+    sentence_type_mix: dict[str, float] = Field(
+        default_factory=dict, description="declarative/interrogative/exclamatory -> proportion."
+    )
+
+
 class StyleProfile(BaseModel):
     """Complete stylometric profile for a document or segment."""
 
@@ -98,6 +144,11 @@ class StyleProfile(BaseModel):
     pos: POSFeatures | None = None
     ngrams: NGramFeatures | None = None
     punctuation: PunctuationFeatures | None = None
+    contractions: ContractionFeatures | None = None
+    sentence_openers: SentenceOpenerFeatures | None = None
+    paragraphs: ParagraphFeatures | None = None
+    dialogue: DialogueFeatures | None = None
+    syntax: SyntaxFeatures | None = None
 
 
 class ComparisonResult(BaseModel):

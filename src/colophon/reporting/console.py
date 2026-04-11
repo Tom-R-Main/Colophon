@@ -32,6 +32,16 @@ def print_analysis_summary(profile: StyleProfile) -> None:
         _print_pos(profile)
     if profile.punctuation:
         _print_punctuation(profile)
+    if profile.contractions:
+        _print_contractions(profile)
+    if profile.sentence_openers:
+        _print_openers(profile)
+    if profile.paragraphs:
+        _print_paragraphs(profile)
+    if profile.dialogue:
+        _print_dialogue(profile)
+    if profile.syntax:
+        _print_syntax(profile)
     if profile.ngrams:
         _print_ngrams(profile)
 
@@ -186,6 +196,104 @@ def _print_punctuation(profile: StyleProfile) -> None:
     table.add_row("Ellipsis", f"{p.ellipsis:.1f}")
     table.add_row("Parenthesis", f"{p.parenthesis:.1f}")
     table.add_row("Quotation", f"{p.quotation:.1f}")
+
+    console.print(table)
+
+
+def _print_contractions(profile: StyleProfile) -> None:
+    c = profile.contractions
+    if not c:
+        return
+    table = Table(title="Contractions", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Total contractions", f"{c.total:,}")
+    table.add_row("Rate", f"{c.rate_per_1000:.1f} per 1000 words")
+
+    console.print(table)
+
+    if c.top_contractions:
+        sub = Table(title="Top Contractions", show_header=True)
+        sub.add_column("Contraction", style="cyan")
+        sub.add_column("Count", justify="right")
+        for word, count in list(c.top_contractions.items())[:10]:
+            sub.add_row(word, f"{count:,}")
+        console.print(sub)
+
+
+def _print_openers(profile: StyleProfile) -> None:
+    o = profile.sentence_openers
+    if not o:
+        return
+    table = Table(title="Sentence Openers", show_header=True)
+    table.add_column("Word", style="cyan")
+    table.add_column("Count", justify="right")
+
+    for word, count in list(o.top_words.items())[:15]:
+        table.add_row(word, f"{count:,}")
+
+    console.print(table)
+    console.print(f"  Sentences starting with But/And/So: [bold]{o.conjunction_start_rate:.1f}%[/bold]")
+
+
+def _print_paragraphs(profile: StyleProfile) -> None:
+    p = profile.paragraphs
+    if not p:
+        return
+    table = Table(title="Paragraph Structure", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Total paragraphs", f"{p.count:,}")
+    table.add_row("Mean length", f"{p.mean_length:.1f} words")
+    table.add_row("Median length", f"{p.median_length:.1f} words")
+    table.add_row("One-sentence paragraphs", f"{p.one_sentence_ratio:.1%}")
+
+    console.print(table)
+
+
+def _print_dialogue(profile: StyleProfile) -> None:
+    d = profile.dialogue
+    if not d:
+        return
+    table = Table(title="Dialogue Patterns", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Quoted speech", f"{d.quoted_word_ratio:.1%}")
+    table.add_row("Narration", f"{d.narration_word_ratio:.1%}")
+
+    console.print(table)
+
+    if d.top_attribution_verbs:
+        sub = Table(title="Attribution Verbs", show_header=True)
+        sub.add_column("Verb", style="cyan")
+        sub.add_column("Count", justify="right")
+        for verb, count in list(d.top_attribution_verbs.items())[:10]:
+            sub.add_row(verb, f"{count:,}")
+        console.print(sub)
+
+
+def _print_syntax(profile: StyleProfile) -> None:
+    s = profile.syntax
+    if not s:
+        return
+    table = Table(title="Syntactic Complexity", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Mean tree depth", f"{s.mean_tree_depth:.2f}")
+    table.add_row("Median tree depth", f"{s.median_tree_depth:.1f}")
+    table.add_row("Stdev tree depth", f"{s.stdev_tree_depth:.2f}")
+
+    if s.tense_distribution:
+        for tense, prop in s.tense_distribution.items():
+            table.add_row(f"Tense: {tense}", f"{prop:.1%}")
+
+    if s.sentence_type_mix:
+        for stype, prop in s.sentence_type_mix.items():
+            table.add_row(f"Type: {stype}", f"{prop:.1%}")
 
     console.print(table)
 

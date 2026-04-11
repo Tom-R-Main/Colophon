@@ -19,10 +19,18 @@ ANALYZERS: dict[str, str] = {
     "pos": "colophon.analysis.pos",
     "ngrams": "colophon.analysis.ngrams",
     "punctuation": "colophon.analysis.punctuation",
+    "contractions": "colophon.analysis.contractions",
+    "sentence_openers": "colophon.analysis.openers",
+    "paragraphs": "colophon.analysis.paragraphs",
+    "dialogue": "colophon.analysis.dialogue",
+    "syntax": "colophon.analysis.syntax",
 }
 
 # Analyzers that need spaCy
-SPACY_ANALYZERS = {"sentences", "vocabulary", "function_words", "pos", "ngrams"}
+SPACY_ANALYZERS = {
+    "sentences", "vocabulary", "function_words", "pos", "ngrams",
+    "contractions", "sentence_openers", "paragraphs", "dialogue", "syntax",
+}
 
 
 def analyze(
@@ -38,8 +46,6 @@ def analyze(
     nlp: Any = None
     if needs_spacy:
         nlp = load_spacy_model(spacy_model)
-        # Optimize: disable components we don't need
-        # We need tagger (POS), senter (sentences), and attribute_ruler
         nlp.max_length = len(doc.text) + 1000
 
     profile = StyleProfile(
@@ -88,4 +94,19 @@ def _run_analyzer(name: str, text: str, nlp: Any) -> Any:
         from colophon.analysis.punctuation import compute_punctuation
         word_count = len(text.split())
         return compute_punctuation(text, word_count)
+    elif name == "contractions":
+        from colophon.analysis.contractions import compute_contractions
+        return compute_contractions(text, nlp)
+    elif name == "sentence_openers":
+        from colophon.analysis.openers import compute_openers
+        return compute_openers(text, nlp)
+    elif name == "paragraphs":
+        from colophon.analysis.paragraphs import compute_paragraphs
+        return compute_paragraphs(text, nlp)
+    elif name == "dialogue":
+        from colophon.analysis.dialogue import compute_dialogue
+        return compute_dialogue(text, nlp)
+    elif name == "syntax":
+        from colophon.analysis.syntax import compute_syntax
+        return compute_syntax(text, nlp)
     return None

@@ -16,6 +16,11 @@ def build_style_prompt(profile: StyleProfile) -> str:
     sections.append(_punctuation_section(profile))
     sections.append(_function_word_section(profile))
     sections.append(_pos_section(profile))
+    sections.append(_contraction_section(profile))
+    sections.append(_opener_section(profile))
+    sections.append(_paragraph_section(profile))
+    sections.append(_dialogue_section(profile))
+    sections.append(_syntax_section(profile))
     sections.append(_rules_section())
 
     return "\n\n".join(s for s in sections if s)
@@ -233,6 +238,205 @@ Part-of-speech profile:
 
 {note_lines}
 </grammar>"""
+
+
+def _contraction_section(profile: StyleProfile) -> str:
+    c = profile.contractions
+    if not c:
+        return ""
+
+    if c.rate_per_1000 > 15:
+        tone = (
+            "This author uses contractions heavily — the voice is informal and conversational. "
+            "Always use contractions: \"don't\" not \"do not\", \"it's\" not \"it is\", "
+            "\"can't\" not \"cannot\". Writing without contractions will sound stiff and wrong."
+        )
+    elif c.rate_per_1000 > 5:
+        tone = "Moderate contraction usage — use contractions naturally but not in every possible spot."
+    else:
+        tone = (
+            "This author rarely uses contractions — the voice is more formal. "
+            "Prefer \"do not\" over \"don't\", \"it is\" over \"it's\"."
+        )
+
+    top_3 = list(c.top_contractions.items())[:3]
+    top_str = ", ".join(f'"{w}" ({n}x)' for w, n in top_3) if top_3 else ""
+
+    return f"""<contractions>
+Contraction rate: {c.rate_per_1000:.1f} per 1000 words ({c.total:,} total).
+Most common: {top_str}
+
+{tone}
+</contractions>"""
+
+
+def _opener_section(profile: StyleProfile) -> str:
+    o = profile.sentence_openers
+    if not o:
+        return ""
+
+    notes: list[str] = []
+
+    if o.conjunction_start_rate > 8:
+        notes.append(
+            f"{o.conjunction_start_rate:.1f}% of sentences start with a coordinating conjunction "
+            "(But, And, So). This is a DEFINING trait. Start many sentences with 'But' or 'And' — "
+            "it creates forward momentum and a conversational, rule-breaking energy."
+        )
+    elif o.conjunction_start_rate > 3:
+        notes.append(
+            f"{o.conjunction_start_rate:.1f}% of sentences start with conjunctions. "
+            "Occasionally start sentences with 'But' or 'And' for emphasis."
+        )
+
+    top_5 = list(o.top_words.items())[:5]
+    opener_str = ", ".join(f'"{w}" ({n}x)' for w, n in top_5)
+
+    if not notes:
+        return ""
+
+    note_lines = "\n".join(f"- {n}" for n in notes)
+    return f"""<sentence-openers>
+Most common sentence starters: {opener_str}
+
+{note_lines}
+</sentence-openers>"""
+
+
+def _paragraph_section(profile: StyleProfile) -> str:
+    p = profile.paragraphs
+    if not p:
+        return ""
+
+    notes: list[str] = []
+
+    if p.one_sentence_ratio > 0.35:
+        notes.append(
+            f"{p.one_sentence_ratio:.0%} of paragraphs are a single sentence. "
+            "This is a SIGNATURE technique. Use one-sentence paragraphs constantly — "
+            "for punchlines, for transitions, for emphasis. A paragraph break is a "
+            "beat of silence. Use it like a comedian uses a pause."
+        )
+    elif p.one_sentence_ratio > 0.15:
+        notes.append(
+            f"{p.one_sentence_ratio:.0%} of paragraphs are a single sentence. "
+            "Use one-sentence paragraphs for emphasis."
+        )
+
+    if p.median_length < 30:
+        notes.append(
+            f"Paragraphs are short — median {p.median_length:.0f} words. "
+            "Keep paragraphs tight. Two or three sentences max in most cases. "
+            "Long blocks of text are alien to this style."
+        )
+
+    if not notes:
+        return ""
+
+    note_lines = "\n".join(f"- {n}" for n in notes)
+    return f"""<paragraph-structure>
+Paragraph statistics:
+- Count: {p.count:,} paragraphs
+- Mean length: {p.mean_length:.1f} words | Median: {p.median_length:.1f} words
+- One-sentence paragraphs: {p.one_sentence_ratio:.0%}
+
+{note_lines}
+</paragraph-structure>"""
+
+
+def _dialogue_section(profile: StyleProfile) -> str:
+    d = profile.dialogue
+    if not d:
+        return ""
+
+    notes: list[str] = []
+
+    if d.quoted_word_ratio > 0.4:
+        notes.append(
+            f"{d.quoted_word_ratio:.0%} of this author's text is direct quotation. "
+            "The author is a LISTENER — they let their subjects speak, then react. "
+            "When rewriting, preserve all original quotes. You may rearrange them or "
+            "break them up with authorial commentary, but the voices must be heard."
+        )
+    elif d.quoted_word_ratio > 0.2:
+        notes.append(
+            f"{d.quoted_word_ratio:.0%} of text is quoted speech. "
+            "Use dialogue to break up narration."
+        )
+    elif d.quoted_word_ratio < 0.1:
+        notes.append(
+            "Very little quoted speech — this author's voice dominates. "
+            "The style is more essayistic than reportorial."
+        )
+
+    top_verb = list(d.top_attribution_verbs.items())[0] if d.top_attribution_verbs else None
+    if top_verb and top_verb[0] == "say":
+        notes.append(
+            f'The dominant attribution verb is "said/says" ({top_verb[1]}x) — '
+            "invisible, workmanlike attribution. Do NOT use fancy speech verbs "
+            '("exclaimed", "opined", "remarked"). Just "said" or "says".'
+        )
+
+    if not notes:
+        return ""
+
+    note_lines = "\n".join(f"- {n}" for n in notes)
+    return f"""<dialogue>
+Dialogue ratio: {d.quoted_word_ratio:.0%} quoted speech, {d.narration_word_ratio:.0%} narration.
+
+{note_lines}
+</dialogue>"""
+
+
+def _syntax_section(profile: StyleProfile) -> str:
+    s = profile.syntax
+    if not s:
+        return ""
+
+    notes: list[str] = []
+
+    if s.mean_tree_depth < 5:
+        notes.append(
+            f"Mean dependency tree depth of {s.mean_tree_depth:.1f} — syntactically simple. "
+            "Favor main clauses over nested subordination. Subject-verb-object. "
+            "Don't bury the point inside a dependent clause."
+        )
+    elif s.mean_tree_depth > 6:
+        notes.append(
+            f"Mean tree depth of {s.mean_tree_depth:.1f} — complex syntax with layered clauses."
+        )
+
+    # Tense mix
+    past = s.tense_distribution.get("Past", 0)
+    pres = s.tense_distribution.get("Pres", 0)
+    if past > 0.3 and pres > 0.25:
+        notes.append(
+            f"Tense splits nearly even: {past:.0%} past, {pres:.0%} present. "
+            "This author shifts between storytelling (past tense) and commentary (present tense). "
+            "Match this: narrate events in past tense, deliver opinions in present."
+        )
+    elif past > 0.5:
+        notes.append(f"Primarily past tense ({past:.0%}) — narrative, storytelling mode.")
+    elif pres > 0.5:
+        notes.append(f"Primarily present tense ({pres:.0%}) — immediate, urgent voice.")
+
+    # Sentence type mix
+    interrog = s.sentence_type_mix.get("interrogative", 0)
+    if interrog > 0.04:
+        notes.append(
+            f"{interrog:.1%} of sentences are questions — use rhetorical questions "
+            "to challenge, provoke, or set up punchlines."
+        )
+
+    if not notes:
+        return ""
+
+    note_lines = "\n".join(f"- {n}" for n in notes)
+    return f"""<syntax>
+Syntactic complexity: mean depth {s.mean_tree_depth:.1f}, median {s.median_tree_depth:.1f}
+
+{note_lines}
+</syntax>"""
 
 
 def _rules_section() -> str:
