@@ -38,6 +38,21 @@ class SearchRequest(BaseModel):
     top: int = 10
 
 
+class GenerateRequest(BaseModel):
+    topic: str
+    style_profile_json: dict[str, Any]
+    provider: str | None = None
+    model: str | None = None
+
+
+class SettingsRequest(BaseModel):
+    anthropic_key: str | None = None
+    openai_key: str | None = None
+    gemini_key: str | None = None
+    openrouter_key: str | None = None
+    default_provider: str | None = None
+
+
 def create_router(*, db_url: str | None = None) -> APIRouter:
     router = APIRouter(prefix="/api")
 
@@ -217,5 +232,118 @@ def create_router(*, db_url: str | None = None) -> APIRouter:
             if os.environ.get(env_var):
                 providers.append(name)
         return providers
+
+    # --- Feature 1: Save to Corpus directly from UI ---
+
+    @router.post("/index-profile")
+    async def index_profile_direct(body: IndexRequest):
+        """Index a StyleProfile directly (from the Analyze view)."""
+        if not db_url:
+            return {"error": "No database configured. Start server with --db flag."}
+
+        from colophon.db import get_session
+        from colophon.db.operations import index_profile
+        from colophon.embeddings.vectorize import style_profile_to_vector
+        from colophon.models.features import StyleProfile
+
+        profile = StyleProfile.model_validate(body.profile_json)
+        vector = style_profile_to_vector(profile)
+
+        session = get_session(db_url)
+        try:
+            row = index_profile(session, profile, vector, author=body.author, lang=body.lang)
+            return {"id": row.id, "author": body.author, "title": profile.document_title}
+        finally:
+            session.close()
+
+    # --- Feature 2: Settings (API key management) ---
+
+    @router.get("/settings")
+    async def get_settings():
+        """Return current provider configuration (keys masked)."""
+        import os
+
+        from dotenv import load_dotenv
+        load_dotenv()
+
+        def mask(key: str | None) -> str | None:
+            if not key:
+                return None
+            if len(key) <= 10:
+                return "***"
+            return key[:6] + "..." + key[-4:]
+
+        key_map = {
+            "anthropic": "ANTHROPIC_API_KEY",
+            "openai": "OPENAI_API_KEY",
+            "gemini": "GEMINI_API_KEY",
+            "openrouter": "OPENROUTER_API_KEY",
+        }
+
+        return {
+            name: {"configured": bool(os.environ.get(env_var)), "masked": mask(os.environ.get(env_var))}
+            for name, env_var in key_map.items()
+        }
+
+    @router.post("/settings")
+    async def save_settings(body: SettingsRequest):
+        """Save API keys to .env file."""
+        import os
+
+        env_path = Path.cwd() / ".env"
+
+        # Read existing .env content (preserve non-API entries)
+        existing_lines: list[str] = []
+        api_keys_to_skip = {
+            "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY", "OPENROUTER_API_KEY",
+        }
+        if env_path.exists():
+            for line in env_path.read_text().splitlines():
+                key_name = line.split("=")[0].strip() if "=" in line else ""
+                if key_name not in api_keys_to_skip:
+                    existing_lines.append(line)
+
+        # Add new keys
+        new_keys = [
+            ("ANTHROPIC_API_KEY", body.anthropic_key),
+            ("OPENAI_API_KEY", body.openai_key),
+            ("GEMINI_API_KEY", body.gemini_key),
+            ("OPENROUTER_API_KEY", body.openrouter_key),
+        ]
+        for env_var, value in new_keys:
+            if value and value.strip():
+                existing_lines.append(f"{env_var}={value.strip()}")
+
+        env_path.write_text("\n".join(existing_lines) + "\n")
+
+        # Reload env vars in-process
+        from dotenv import load_dotenv
+        load_dotenv(override=True)
+        for env_var, value in new_keys:
+            if value and value.strip():
+                os.environ[env_var] = value.strip()
+
+        return {"status": "saved"}
+
+    # --- Feature 3: Generate new content in a computed style ---
+
+    @router.post("/generate")
+    async def generate_in_style(body: GenerateRequest):
+        """Generate new content in a target author's style."""
+        from colophon.models.features import StyleProfile
+        from colophon.stylize.llm import stylize_text
+        from colophon.stylize.prompt import build_style_prompt
+
+        profile = StyleProfile.model_validate(body.style_profile_json)
+        system_prompt = build_style_prompt(profile, mode="generate")
+
+        user_message = (
+            "Write an original piece on the following topic in the target author's style. "
+            "Match the voice, rhythm, sentence structure, and rhetorical approach precisely.\n\n"
+            f"Topic: {body.topic}"
+        )
+
+        result = stylize_text(system_prompt, user_message, provider=body.provider, model=body.model)
+        return {"generated": result, "word_count": len(result.split())}
 
     return router

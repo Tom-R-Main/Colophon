@@ -269,6 +269,10 @@ tr:hover td { background: rgba(42,46,82,0.3); }
     <button class="nav-btn" data-view="search" title="Search">
       <span>?</span><span class="nav-tooltip">Search</span>
     </button>
+    <div style="flex:1"></div>
+    <button class="nav-btn" data-view="settings" title="Settings">
+      <span style="font-size:0.9rem">*</span><span class="nav-tooltip">Settings</span>
+    </button>
   </nav>
 
   <div class="main">
@@ -327,13 +331,28 @@ tr:hover td { background: rgba(42,46,82,0.3); }
         </div>
       </div>
 
-      <div class="form-group" style="margin-bottom:1rem">
-        <label>Article to restyle</label>
-        <textarea id="stylize-input" placeholder="Paste the article text here..."></textarea>
+      <div style="display:flex;gap:0.5rem;margin-bottom:1.25rem">
+        <button class="btn stylize-mode active" data-mode="restyle">Restyle Existing</button>
+        <button class="btn btn-secondary stylize-mode" data-mode="generate">Write New</button>
+      </div>
+
+      <div id="stylize-restyle-mode">
+        <div class="form-group" style="margin-bottom:1rem">
+          <label>Article to restyle</label>
+          <textarea id="stylize-input" placeholder="Paste the article text here..."></textarea>
+        </div>
+      </div>
+
+      <div id="stylize-generate-mode" style="display:none">
+        <div class="form-group" style="margin-bottom:1rem">
+          <label>Topic or brief</label>
+          <textarea id="generate-input" placeholder="Write about the Cubs losing again..." style="min-height:80px"></textarea>
+        </div>
       </div>
 
       <div style="display:flex;gap:0.75rem;margin-bottom:1.5rem">
         <button class="btn" id="stylize-go">Stylize</button>
+        <button class="btn" id="generate-go" style="display:none">Generate</button>
         <button class="btn btn-secondary" id="stylize-prompt-btn">Preview Prompt</button>
       </div>
 
@@ -392,6 +411,57 @@ tr:hover td { background: rgba(42,46,82,0.3); }
       <div id="search-results" style="margin-top:1.5rem"></div>
     </div>
 
+    <!-- SETTINGS VIEW -->
+    <div class="view" id="view-settings">
+      <div class="page-header">
+        <h1>Settings</h1>
+        <div class="subtitle">Configure LLM providers and API keys</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">API Keys</div>
+        <p style="font-size:0.75rem;color:var(--text-dim);margin-bottom:1rem">
+          Set API keys for the LLM providers you want to use for style transfer and generation.
+          Keys are saved to <code>.env</code> in the project directory.
+        </p>
+
+        <div class="form-group" style="margin-bottom:1rem">
+          <label>Anthropic API Key</label>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <input type="password" id="settings-anthropic" placeholder="sk-ant-...">
+            <span id="settings-anthropic-status" style="font-size:0.7rem"></span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:1rem">
+          <label>OpenAI API Key</label>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <input type="password" id="settings-openai" placeholder="sk-...">
+            <span id="settings-openai-status" style="font-size:0.7rem"></span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:1rem">
+          <label>Gemini API Key</label>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <input type="password" id="settings-gemini" placeholder="AI...">
+            <span id="settings-gemini-status" style="font-size:0.7rem"></span>
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom:1.5rem">
+          <label>OpenRouter API Key</label>
+          <div style="display:flex;gap:0.5rem;align-items:center">
+            <input type="password" id="settings-openrouter" placeholder="sk-or-...">
+            <span id="settings-openrouter-status" style="font-size:0.7rem"></span>
+          </div>
+        </div>
+
+        <button class="btn" id="settings-save">Save Keys</button>
+        <span id="settings-status" style="font-size:0.75rem;margin-left:1rem;color:var(--green)"></span>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -406,6 +476,7 @@ document.querySelectorAll('.nav-btn').forEach(btn => {
     btn.classList.add('active');
     document.getElementById('view-' + btn.dataset.view).classList.add('active');
     if (btn.dataset.view === 'corpus') loadCorpus();
+    if (btn.dataset.view === 'settings') loadSettings();
   });
 });
 
@@ -531,7 +602,34 @@ function renderAnalysis(p, container) {
     html += '</div>';
   }
 
+  // Save to Corpus button
+  html += `<div class="card" style="text-align:center;padding:1.25rem">
+    <div style="display:flex;gap:0.75rem;align-items:center;justify-content:center">
+      <input type="text" id="save-author-name" placeholder="Author name" style="max-width:250px">
+      <button class="btn" id="save-to-corpus-btn">Save to Corpus</button>
+      <span id="save-corpus-status" style="font-size:0.75rem;color:var(--green)"></span>
+    </div>
+  </div>`;
+
   container.innerHTML = html;
+
+  // Wire save button
+  document.getElementById('save-to-corpus-btn')?.addEventListener('click', async () => {
+    const author = document.getElementById('save-author-name').value.trim();
+    if (!author) { document.getElementById('save-corpus-status').textContent = 'Enter author name'; return; }
+    const statusEl = document.getElementById('save-corpus-status');
+    statusEl.innerHTML = '<span class="spinner"></span>';
+    try {
+      const res = await fetch(API + '/index-profile', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ profile_json: currentProfile, author, lang: document.getElementById('analyze-lang').value }),
+      });
+      const data = await res.json();
+      if (data.error) { statusEl.textContent = data.error; return; }
+      statusEl.innerHTML = `<span style="color:var(--green)">Saved as ${author}</span>`;
+      loadCorpus();
+    } catch(err) { statusEl.textContent = 'Error: ' + err.message; }
+  });
 
   // Render Plotly charts
   const dark = { paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#e8e6e3',size:11,family:'JetBrains Mono'}, margin:{l:40,r:20,t:10,b:40} };
@@ -603,7 +701,21 @@ function populateAuthorDropdowns(docs) {
   });
 }
 
-// === STYLIZE ===
+// === STYLIZE MODE TOGGLE ===
+let stylizeMode = 'restyle';
+document.querySelectorAll('.stylize-mode').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.stylize-mode').forEach(b => { b.classList.remove('active'); b.classList.add('btn-secondary'); });
+    btn.classList.add('active'); btn.classList.remove('btn-secondary');
+    stylizeMode = btn.dataset.mode;
+    document.getElementById('stylize-restyle-mode').style.display = stylizeMode === 'restyle' ? 'block' : 'none';
+    document.getElementById('stylize-generate-mode').style.display = stylizeMode === 'generate' ? 'block' : 'none';
+    document.getElementById('stylize-go').style.display = stylizeMode === 'restyle' ? 'inline-flex' : 'none';
+    document.getElementById('generate-go').style.display = stylizeMode === 'generate' ? 'inline-flex' : 'none';
+  });
+});
+
+// Restyle handler
 document.getElementById('stylize-go').addEventListener('click', async () => {
   const input = document.getElementById('stylize-input').value;
   if (!input.trim()) return;
@@ -612,9 +724,8 @@ document.getElementById('stylize-go').addEventListener('click', async () => {
   const results = document.getElementById('stylize-results');
   const provider = document.getElementById('stylize-provider').value || null;
 
-  // Use current analyzed profile or prompt to analyze first
   if (!currentProfile) {
-    status.innerHTML = '<span style="color:var(--accent)">Analyze a document first to set the target style, or select from corpus.</span>';
+    status.innerHTML = '<span style="color:var(--accent)">Analyze a document first to set the target style.</span>';
     return;
   }
 
@@ -625,11 +736,7 @@ document.getElementById('stylize-go').addEventListener('click', async () => {
     const res = await fetch(API + '/stylize', {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        article_text: input,
-        style_profile_json: currentProfile,
-        provider: provider,
-      }),
+      body: JSON.stringify({ article_text: input, style_profile_json: currentProfile, provider }),
     });
     const data = await res.json();
     status.innerHTML = `Original: ${data.original_words} words | Restyled: ${data.restyled_words} words`;
@@ -643,6 +750,42 @@ document.getElementById('stylize-go').addEventListener('click', async () => {
   }
 });
 
+// Generate handler
+document.getElementById('generate-go').addEventListener('click', async () => {
+  const topic = document.getElementById('generate-input').value;
+  if (!topic.trim()) return;
+
+  const status = document.getElementById('stylize-status');
+  const results = document.getElementById('stylize-results');
+  const provider = document.getElementById('stylize-provider').value || null;
+
+  if (!currentProfile) {
+    status.innerHTML = '<span style="color:var(--accent)">Analyze a document first to set the target style.</span>';
+    return;
+  }
+
+  status.innerHTML = '<span class="spinner"></span> Generating...';
+  results.innerHTML = '';
+
+  try {
+    const res = await fetch(API + '/generate', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ topic, style_profile_json: currentProfile, provider }),
+    });
+    const data = await res.json();
+    status.innerHTML = `Generated: ${data.word_count} words`;
+    results.innerHTML = `
+      <div class="card">
+        <div class="card-header">Generated in style of ${currentProfile.document_title}</div>
+        <div class="text-panel" style="max-height:none">${escapeHtml(data.generated)}</div>
+      </div>`;
+  } catch(err) {
+    status.innerHTML = `<span style="color:var(--accent)">Error: ${err.message}</span>`;
+  }
+});
+
+// Prompt preview
 document.getElementById('stylize-prompt-btn').addEventListener('click', async () => {
   if (!currentProfile) return;
   const results = document.getElementById('stylize-results');
@@ -653,6 +796,44 @@ document.getElementById('stylize-prompt-btn').addEventListener('click', async ()
   });
   const data = await res.json();
   results.innerHTML = `<div class="card"><div class="card-header">System Prompt</div><div class="prompt-preview">${escapeHtml(data.prompt)}</div></div>`;
+});
+
+// === SETTINGS ===
+async function loadSettings() {
+  try {
+    const res = await fetch(API + '/settings');
+    const data = await res.json();
+    ['anthropic','openai','gemini','openrouter'].forEach(name => {
+      const statusEl = document.getElementById(`settings-${name}-status`);
+      if (data[name]?.configured) {
+        statusEl.innerHTML = `<span style="color:var(--green)">configured</span>`;
+      } else {
+        statusEl.innerHTML = `<span style="color:var(--text-muted)">not set</span>`;
+      }
+    });
+  } catch(e) {}
+}
+
+document.getElementById('settings-save').addEventListener('click', async () => {
+  const body = {
+    anthropic_key: document.getElementById('settings-anthropic').value || null,
+    openai_key: document.getElementById('settings-openai').value || null,
+    gemini_key: document.getElementById('settings-gemini').value || null,
+    openrouter_key: document.getElementById('settings-openrouter').value || null,
+  };
+  const res = await fetch(API + '/settings', {
+    method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  document.getElementById('settings-status').textContent = 'Saved';
+  setTimeout(() => { document.getElementById('settings-status').textContent = ''; }, 3000);
+  // Refresh providers dropdown
+  const provRes = await fetch(API + '/providers');
+  const providers = await provRes.json();
+  const sel = document.getElementById('stylize-provider');
+  sel.innerHTML = '<option value="">auto</option>';
+  providers.forEach(p => { const o = document.createElement('option'); o.value = p; o.textContent = p; sel.appendChild(o); });
+  loadSettings();
 });
 
 // === SEARCH ===

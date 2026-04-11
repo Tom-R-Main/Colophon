@@ -8,18 +8,22 @@ from pathlib import Path
 def create_app(*, db_url: str | None = None):
     """Create the FastAPI application."""
     from fastapi import FastAPI
-    from fastapi.staticfiles import StaticFiles
+    from fastapi.responses import FileResponse
 
     from colophon.web.api import create_router
 
     app = FastAPI(title="Colophon", description="Stylometric analysis web UI")
 
-    # API routes
+    # API routes FIRST (before static mount)
     router = create_router(db_url=db_url)
     app.include_router(router)
 
-    # Serve static frontend
+    # Serve static frontend at root — use a catch-all route instead of mount
+    # so API routes take precedence
     static_dir = Path(__file__).parent / "static"
-    app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+
+    @app.get("/")
+    async def serve_index():
+        return FileResponse(str(static_dir / "index.html"))
 
     return app

@@ -10,11 +10,16 @@ def build_style_prompt(
     *,
     examples: list[str] | None = None,
     fingerprint_diff: str | None = None,
+    mode: str = "restyle",
 ) -> str:
-    """Convert a StyleProfile into a detailed system prompt for style transfer."""
+    """Convert a StyleProfile into a detailed system prompt for style transfer.
+
+    Args:
+        mode: "restyle" (rewrite existing article) or "generate" (write new content).
+    """
     sections: list[str] = []
 
-    sections.append(_role_section(profile))
+    sections.append(_role_section(profile, mode=mode))
     if examples:
         from colophon.stylize.examples import format_examples_prompt
         sections.append(format_examples_prompt(examples))
@@ -31,12 +36,19 @@ def build_style_prompt(
     sections.append(_syntax_section(profile))
     if fingerprint_diff:
         sections.append(fingerprint_diff)
-    sections.append(_rules_section())
+    sections.append(_rules_section(mode=mode))
 
     return "\n\n".join(s for s in sections if s)
 
 
-def _role_section(profile: StyleProfile) -> str:
+def _role_section(profile: StyleProfile, *, mode: str = "restyle") -> str:
+    if mode == "generate":
+        return f"""<role>
+You are a writer whose voice precisely matches the author behind \
+"{profile.document_title}". Your job is to write original content on a given topic \
+in this author's distinctive voice. You are not imitating — you ARE this voice. \
+Match the rhythm, word choice, rhetorical devices, and personality exactly.
+</role>"""
     return f"""<role>
 You are a ghostwriter who has deeply studied the writing style of the author behind \
 "{profile.document_title}". Your job is to rewrite a given article in this author's \
@@ -449,7 +461,16 @@ Syntactic complexity: mean depth {s.mean_tree_depth:.1f}, median {s.median_tree_
 </syntax>"""
 
 
-def _rules_section() -> str:
+def _rules_section(*, mode: str = "restyle") -> str:
+    if mode == "generate":
+        return """<rules>
+- Write original content on the given topic in the target voice.
+- Match the measured style targets precisely — sentence length, paragraph structure, \
+punctuation habits, vocabulary register, and rhetorical devices.
+- Start with a strong hook. End with a memorable kicker.
+- Use the voice naturally — don't call attention to the style itself.
+- Output ONLY the written piece. No preamble, no explanation, no meta-commentary.
+</rules>"""
     return """<rules>
 - Preserve ALL facts, names, dates, quotes, and data from the original article. Do not invent.
 - You may restructure paragraphs, rewrite sentences, change word choices, and add \
