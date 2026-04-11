@@ -17,7 +17,7 @@
 Colophon is a Python CLI that extracts an author's stylometric fingerprint from their writing and uses it to restyle other text in their voice. All analysis is deterministic — no ML, no LLM. The style transfer step uses Claude, guided by a system prompt built entirely from the measured data.
 
 ```text
-ingest (PDF/EPUB/TXT/MD) -> analyze (7 features) -> stylize (Claude rewrite)
+ingest (PDF/EPUB/TXT/MD) -> analyze (12 features) -> stylize (Claude rewrite)
                                                   -> report (HTML/console)
                                                   -> compare (Burrows' Delta)
 ```
@@ -45,7 +45,7 @@ That's it. You'll get a full stylometric report in the terminal and a `.analysis
 
 ## What It Does
 
-Colophon computes seven deterministic features from any English text:
+Colophon computes twelve deterministic features from any English text:
 
 | Feature | What It Measures | Library |
 |---------|-----------------|---------|
@@ -56,6 +56,11 @@ Colophon computes seven deterministic features from any English text:
 | **POS distribution** | Noun/verb/adj/adv proportions, adj-noun ratio | spaCy |
 | **N-grams** | Word bigrams/trigrams, character trigrams | spaCy + stdlib |
 | **Punctuation** | Per-1000-word rates for commas, dashes, quotes, etc. | stdlib |
+| **Contractions** | Contraction rate and types (don't, it's, etc.) | spaCy |
+| **Sentence openers** | What words/POS tags start sentences, conjunction-start rate | spaCy |
+| **Paragraph structure** | Paragraph length, one-sentence paragraph ratio | spaCy |
+| **Dialogue patterns** | Quoted speech ratio, attribution verbs (said vs. exclaimed) | spaCy |
+| **Syntax complexity** | Dependency tree depth, verb tense distribution, sentence types | spaCy |
 
 These features are the same ones used in academic stylometry and forensic authorship attribution. They capture unconscious habits — sentence length, function word choice, punctuation tics — that are more distinctive than vocabulary or topic.
 
@@ -93,7 +98,7 @@ colophon analyze book.colophon.json                # Analyze pre-ingested docume
 colophon analyze book.pdf --analyzers readability,sentences  # Run specific analyzers
 ```
 
-Available analyzers: `readability`, `sentences`, `vocabulary`, `function_words`, `pos`, `ngrams`, `punctuation`
+Available analyzers: `readability`, `sentences`, `vocabulary`, `function_words`, `pos`, `ngrams`, `punctuation`, `contractions`, `sentence_openers`, `paragraphs`, `dialogue`, `syntax`
 
 ### `compare`
 
@@ -209,11 +214,13 @@ colophon/
 
 ## How Style Transfer Works
 
-1. `analyze` computes a `StyleProfile` — readability scores, sentence length distribution, vocabulary metrics, function word frequencies, POS ratios, punctuation patterns
+1. `analyze` computes a `StyleProfile` across 12 dimensions — readability, sentence rhythm, vocabulary, function words, POS ratios, punctuation, contractions, sentence openers, paragraph structure, dialogue patterns, and syntactic complexity
 2. `stylize` converts that profile into an XML-tagged system prompt with specific numeric targets:
    - *"Mean sentence length: 17.7 words. Median: 15.0. Skewness: 2.93."*
-   - *"Em-dashes at 3.7/1000 words — use for parenthetical asides and dramatic pauses."*
-   - *"'I' appears at 12.3/1000 — the voice is personal and opinionated."*
+   - *"47% of paragraphs are a single sentence — use one-sentence paragraphs for punchlines."*
+   - *"12.2% of sentences start with But/And/So — start many sentences with conjunctions."*
+   - *"53% quoted speech — let characters speak, then comment. Attribution verb: 'said' only."*
+   - *"Contraction rate 22.8/1000 — always use don't, can't, it's. Never do not, cannot, it is."*
 3. Claude rewrites the input article to match those targets while preserving all original facts and quotes
 
 Use `--show-prompt` to inspect the generated system prompt without making an API call.
