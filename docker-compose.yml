@@ -1,0 +1,15 @@
+services:
+  colophon-db:
+    image: pgvector/pgvector:pg17
+    environment:
+      POSTGRES_DB: colophon
+      POSTGRES_USER: colophon
+      POSTGRES_PASSWORD: colophon_dev
+    ports:
+      - "5433:5432"
+    volumes:
+      - colophon_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  colophon_data:

@@ -39,8 +39,14 @@ def analyze(
     analyzers: list[str] | None = None,
     spacy_model: str = "en_core_web_sm",
     lang: str = "en",
+    chunk_size: int = 50_000,
+    workers: int | None = None,
 ) -> StyleProfile:
-    """Run the analysis pipeline on a document."""
+    """Run the analysis pipeline on a document.
+
+    For documents over chunk_size words, automatically uses multiprocessing
+    to parallelize spaCy-dependent analyzers across text chunks.
+    """
     from colophon.lang import get_profile
     lang_profile = get_profile(lang)
 
@@ -52,6 +58,15 @@ def analyze(
 
     needs_spacy = any(a in SPACY_ANALYZERS for a in active)
 
+    # Auto-route to chunked processing for large documents
+    if needs_spacy and doc.word_count > chunk_size:
+        from colophon.analysis.chunked import analyze_chunked
+        return analyze_chunked(
+            doc, analyzers=active, spacy_model=spacy_model,
+            lang=lang, chunk_size=chunk_size, workers=workers,
+        )
+
+    # Standard single-pass for smaller documents
     nlp: Any = None
     if needs_spacy:
         model = spacy_model if spacy_model != "en_core_web_sm" else lang_profile.spacy_model

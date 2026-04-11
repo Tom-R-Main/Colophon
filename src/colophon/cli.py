@@ -212,3 +212,123 @@ def stylize(
     console.print(f"\n[green]Restyled article saved to:[/green] {out_path}")
     console.print(f"[dim]Original: {len(article_text.split()):,} words | "
                   f"Restyled: {len(result.split()):,} words[/dim]")
+
+
+@app.command()
+def index(
+    path: Path = typer.Argument(..., help="Path to a file or .colophon.json to index."),
+    author: str = typer.Option(..., "--author", "-a", help="Author name for this document."),
+    db: str = typer.Option(
+        "postgresql://colophon:colophon_dev@localhost:5433/colophon", "--db", help="Database URL."
+    ),
+    lang: str = typer.Option("en", "--lang", help="Language code."),
+) -> None:
+    """Index a document's style profile into the vector database."""
+    from colophon.analysis.pipeline import analyze as do_analyze
+    from colophon.db import get_session
+    from colophon.db.operations import index_profile
+    from colophon.embeddings.vectorize import style_profile_to_vector
+    from colophon.models.document import Document
+
+    if not path.exists():
+        console.print(f"[red]File not found:[/red] {path}")
+        raise typer.Exit(1)
+
+    # Load or ingest
+    if path.suffix == ".json" and "analysis" in path.name:
+        from colophon.models.features import StyleProfile
+        profile = StyleProfile.model_validate_json(path.read_text())
+    else:
+        if path.suffix == ".json":
+            doc = Document.model_validate_json(path.read_text())
+        else:
+            from colophon.ingestion import ingest as do_ingest
+            doc = do_ingest(path)
+        profile = do_analyze(doc, lang=lang)
+
+    # Vectorize
+    classical_vector = style_profile_to_vector(profile)
+
+    # Store
+    session = get_session(db)
+    try:
+        row = index_profile(session, profile, classical_vector, author=author, lang=lang)
+        console.print(f"[green]Indexed:[/green] {profile.document_title}")
+        console.print(f"  Author: {author}")
+        console.print(f"  Vector: {len(classical_vector)} dims")
+        console.print(f"  DB ID: {row.id}")
+    finally:
+        session.close()
+
+
+@app.command(name="search-style")
+def search_style(
+    path: Path = typer.Argument(..., help="Path to a file to find style matches for."),
+    db: str = typer.Option(
+        "postgresql://colophon:colophon_dev@localhost:5433/colophon", "--db", help="Database URL."
+    ),
+    top: int = typer.Option(10, "--top", "-n", help="Number of results to return."),
+    lang: str = typer.Option("en", "--lang", help="Language code."),
+) -> None:
+    """Find authors and documents with the most similar writing style."""
+    from rich.table import Table
+
+    from colophon.analysis.pipeline import analyze as do_analyze
+    from colophon.db import get_session
+    from colophon.db.operations import search_authors, search_similar
+    from colophon.embeddings.vectorize import style_profile_to_vector
+    from colophon.models.document import Document
+
+    if not path.exists():
+        console.print(f"[red]File not found:[/red] {path}")
+        raise typer.Exit(1)
+
+    # Analyze input
+    if path.suffix == ".json" and "analysis" in path.name:
+        from colophon.models.features import StyleProfile
+        profile = StyleProfile.model_validate_json(path.read_text())
+    else:
+        if path.suffix == ".json":
+            doc = Document.model_validate_json(path.read_text())
+        else:
+            from colophon.ingestion import ingest as do_ingest
+            doc = do_ingest(path)
+        profile = do_analyze(doc, lang=lang)
+
+    vector = style_profile_to_vector(profile)
+
+    session = get_session(db)
+    try:
+        # Search by author
+        author_results = search_authors(session, vector, limit=top)
+        if author_results:
+            table = Table(title="Most Similar Authors")
+            table.add_column("Rank", justify="right", style="bold")
+            table.add_column("Author", style="cyan")
+            table.add_column("Documents", justify="right")
+            table.add_column("Similarity", justify="right")
+            for i, r in enumerate(author_results, 1):
+                table.add_row(str(i), r["author"], str(r["doc_count"]), f"{r['similarity']:.4f}")
+            console.print(table)
+
+        # Search by document
+        doc_results = search_similar(session, vector, limit=top)
+        if doc_results:
+            table = Table(title="Most Similar Documents")
+            table.add_column("Rank", justify="right", style="bold")
+            table.add_column("Title", style="cyan")
+            table.add_column("Author")
+            table.add_column("Words", justify="right")
+            table.add_column("Similarity", justify="right")
+            for i, r in enumerate(doc_results, 1):
+                table.add_row(
+                    str(i), r["title"][:50], r["author"] or "—",
+                    f"{r['word_count']:,}" if r["word_count"] else "—",
+                    f"{r['similarity']:.4f}",
+                )
+            console.print(table)
+
+        if not author_results and not doc_results:
+            console.print("[yellow]No indexed profiles found. Run 'colophon index' first.[/yellow]")
+    finally:
+        session.close()

@@ -32,10 +32,19 @@ stylize = [
     "anthropic>=0.40.0",
     "python-dotenv>=1.0.0",
 ]
+embeddings = [
+    "pgvector>=0.3.0",
+    "sqlalchemy>=2.0.0",
+    "psycopg2-binary>=2.9.0",
+]
+neural = [
+    "sentence-transformers>=2.2.0",
+    "torch>=2.0.0",
+]
 ocr = [
     "ocrmypdf>=16.0.0",
 ]
-all = ["colophon[ingest,analysis,report,stylize]"]
+all = ["colophon[ingest,analysis,report,stylize,embeddings]"]
 dev = [
     "colophon[all]",
     "pytest>=8.0.0",
