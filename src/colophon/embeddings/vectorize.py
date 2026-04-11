@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from colophon.models.features import StyleProfile
 
 # Canonical POS tags (Universal Dependencies) — fixed order for vector stability
@@ -148,5 +150,29 @@ def style_profile_to_vector(profile: StyleProfile) -> list[float]:
         features.extend([0.0] * (VECTOR_DIM - len(features)))
     elif len(features) > VECTOR_DIM:
         features = features[:VECTOR_DIM]
+
+    # Normalize: log-scale high-magnitude values, then L2 normalize
+    features = _normalize_vector(features)
+
+    return features
+
+
+# Dimensions that can have very large values and need log-scaling.
+# Indices correspond to: readability scores (0-5), sentence count (10),
+# vocabulary counts (11-12), Honore's R (14), paragraph lengths (78-79)
+_LOG_SCALE_DIMS = {10, 11, 12, 14, 78, 79}
+
+
+def _normalize_vector(features: list[float]) -> list[float]:
+    """Log-scale high-magnitude dimensions, then L2-normalize the vector."""
+    # Log-scale dimensions that can span orders of magnitude
+    for i in _LOG_SCALE_DIMS:
+        if i < len(features) and features[i] > 0:
+            features[i] = math.log1p(features[i])
+
+    # L2 normalize so cosine similarity works properly
+    magnitude = math.sqrt(sum(x * x for x in features))
+    if magnitude > 0:
+        features = [x / magnitude for x in features]
 
     return features
