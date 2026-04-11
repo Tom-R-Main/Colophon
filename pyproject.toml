@@ -41,10 +41,15 @@ neural = [
     "sentence-transformers>=2.2.0",
     "torch>=2.0.0",
 ]
+web = [
+    "fastapi>=0.115.0",
+    "uvicorn>=0.30.0",
+    "python-multipart>=0.0.9",
+]
 ocr = [
     "ocrmypdf>=16.0.0",
 ]
-all = ["colophon[ingest,analysis,report,stylize,embeddings]"]
+all = ["colophon[ingest,analysis,report,stylize,embeddings,web]"]
 dev = [
     "colophon[all]",
     "pytest>=8.0.0",

@@ -332,3 +332,21 @@ def search_style(
             console.print("[yellow]No indexed profiles found. Run 'colophon index' first.[/yellow]")
     finally:
         session.close()
+
+
+@app.command()
+def serve(
+    port: int = typer.Option(8099, "--port", "-p", help="Port to listen on."),
+    host: str = typer.Option("127.0.0.1", "--host", help="Host to bind to."),
+    db: Optional[str] = typer.Option(
+        None, "--db", help="PostgreSQL connection URL for vector search."
+    ),
+) -> None:
+    """Start the Colophon web UI."""
+    import uvicorn
+
+    from colophon.web import create_app
+
+    web_app = create_app(db_url=db)
+    console.print(f"[bold]Colophon[/bold] web UI starting at [cyan]http://{host}:{port}[/cyan]")
+    uvicorn.run(web_app, host=host, port=port)

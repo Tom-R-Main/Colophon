@@ -1,0 +1,713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Colophon</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0d0f1a;
+  --bg2: #131627;
+  --surface: #1a1d35;
+  --surface2: #242849;
+  --border: #2a2e52;
+  --text: #e8e6e3;
+  --text-dim: #8b8a96;
+  --text-muted: #55546a;
+  --accent: #e94560;
+  --accent-glow: rgba(233,69,96,0.15);
+  --green: #4ecca3;
+  --green-glow: rgba(78,204,163,0.15);
+  --purple: #7c5cbf;
+  --amber: #f0a500;
+  --serif: 'Cormorant Garamond', Georgia, serif;
+  --mono: 'JetBrains Mono', 'SF Mono', monospace;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html { font-size:15px; }
+body {
+  font-family: var(--mono);
+  font-weight: 300;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.7;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content:'';
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background: radial-gradient(ellipse at 20% 0%, rgba(233,69,96,0.04) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 100%, rgba(78,204,163,0.03) 0%, transparent 60%);
+}
+
+/* Layout */
+.app { display:flex; min-height:100vh; position:relative; z-index:1; }
+.nav {
+  width: 64px; flex-shrink:0;
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center;
+  padding: 1.5rem 0; gap: 0.25rem;
+  position: sticky; top:0; height:100vh;
+}
+.nav-logo {
+  font-family: var(--serif); font-size: 1.4rem; font-weight: 700;
+  color: var(--accent); margin-bottom: 2rem;
+  writing-mode: vertical-rl; text-orientation: mixed;
+  letter-spacing: 0.15em; cursor: default;
+}
+.nav-btn {
+  width:44px; height:44px; border:none; background:transparent;
+  color: var(--text-dim); cursor:pointer; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size: 1.1rem; transition: all 0.2s;
+  position:relative;
+}
+.nav-btn:hover { background: var(--surface); color: var(--text); }
+.nav-btn.active { background: var(--surface2); color: var(--accent); }
+.nav-btn.active::before {
+  content:''; position:absolute; left:0; top:25%; bottom:25%;
+  width:2px; background: var(--accent); border-radius:1px;
+}
+.nav-tooltip {
+  position:absolute; left:56px; top:50%; transform:translateY(-50%);
+  background: var(--surface2); color: var(--text); padding: 4px 10px;
+  border-radius: 4px; font-size: 0.7rem; white-space:nowrap;
+  opacity:0; pointer-events:none; transition: opacity 0.15s;
+  font-family: var(--mono); letter-spacing: 0.05em;
+}
+.nav-btn:hover .nav-tooltip { opacity:1; }
+
+.main { flex:1; padding:2.5rem 3rem; max-width:1200px; }
+
+/* Header */
+.page-header {
+  margin-bottom: 2.5rem;
+  animation: fadeIn 0.6s ease-out;
+}
+.page-header h1 {
+  font-family: var(--serif); font-size: 2.2rem; font-weight: 700;
+  color: var(--text); letter-spacing: -0.02em; margin-bottom: 0.25rem;
+}
+.page-header .subtitle {
+  font-size: 0.75rem; color: var(--text-muted);
+  letter-spacing: 0.12em; text-transform: uppercase;
+}
+
+/* Cards */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.25rem;
+  animation: slideUp 0.4s ease-out both;
+}
+.card-header {
+  font-family: var(--serif); font-size: 1.1rem; font-weight: 600;
+  color: var(--green); margin-bottom: 1rem;
+  text-transform: uppercase; letter-spacing: 0.08em; font-size: 0.8rem;
+}
+
+/* Stat cards */
+.stats-row { display:flex; gap:1rem; margin-bottom:1.5rem; flex-wrap:wrap; }
+.stat-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 1.2rem 1.5rem;
+  flex: 1; min-width: 140px;
+  animation: slideUp 0.4s ease-out both;
+}
+.stat-card .value {
+  font-family: var(--serif); font-size: 2rem; font-weight: 700;
+  color: var(--accent); line-height: 1.1;
+}
+.stat-card .label {
+  font-size: 0.65rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.12em; margin-top: 0.3rem;
+}
+
+/* Upload zone */
+.upload-zone {
+  border: 2px dashed var(--border);
+  border-radius: 12px;
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s;
+  background: var(--bg2);
+}
+.upload-zone:hover, .upload-zone.dragover {
+  border-color: var(--accent);
+  background: var(--accent-glow);
+}
+.upload-zone .icon { font-size: 2.5rem; margin-bottom: 0.75rem; color: var(--text-dim); }
+.upload-zone .label { font-size: 0.8rem; color: var(--text-dim); }
+.upload-zone .formats {
+  font-size: 0.65rem; color: var(--text-muted); margin-top: 0.5rem;
+  letter-spacing: 0.05em;
+}
+
+/* Forms */
+select, input[type="text"], textarea {
+  background: var(--bg2); border: 1px solid var(--border);
+  color: var(--text); padding: 0.5rem 0.75rem; border-radius: 6px;
+  font-family: var(--mono); font-size: 0.8rem; font-weight: 300;
+  width: 100%; outline: none; transition: border-color 0.2s;
+}
+select:focus, input:focus, textarea:focus { border-color: var(--accent); }
+textarea { min-height: 200px; resize: vertical; line-height: 1.6; }
+
+.btn {
+  background: var(--accent); color: white; border: none;
+  padding: 0.6rem 1.5rem; border-radius: 6px; cursor: pointer;
+  font-family: var(--mono); font-size: 0.75rem; font-weight: 500;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  transition: all 0.2s;
+}
+.btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+.btn-secondary {
+  background: transparent; border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+.btn-secondary:hover { border-color: var(--text-dim); color: var(--text); }
+
+.form-row { display:flex; gap:0.75rem; align-items:end; margin-bottom:1rem; }
+.form-group { display:flex; flex-direction:column; gap:0.3rem; }
+.form-group label {
+  font-size: 0.65rem; color: var(--text-muted);
+  text-transform: uppercase; letter-spacing: 0.1em;
+}
+
+/* Tables */
+table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+th {
+  text-align:left; padding:0.6rem 0.75rem;
+  font-size:0.65rem; color:var(--text-muted);
+  text-transform:uppercase; letter-spacing:0.1em;
+  border-bottom: 1px solid var(--border);
+  font-weight: 500;
+}
+td {
+  padding:0.6rem 0.75rem; border-bottom:1px solid rgba(42,46,82,0.4);
+  vertical-align: middle;
+}
+tr:hover td { background: rgba(42,46,82,0.3); }
+.num { text-align:right; font-variant-numeric:tabular-nums; }
+
+/* Two-column layout */
+.split { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; }
+@media(max-width:900px) { .split { grid-template-columns:1fr; } }
+
+/* Chart container */
+.chart { width:100%; min-height:320px; border-radius:8px; overflow:hidden; }
+
+/* Loading */
+.spinner {
+  display:inline-block; width:16px; height:16px;
+  border:2px solid var(--border); border-top-color:var(--accent);
+  border-radius:50%; animation:spin 0.6s linear infinite;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* Prompt preview */
+.prompt-preview {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; padding: 1rem; max-height: 400px;
+  overflow-y: auto; font-size: 0.75rem; line-height: 1.6;
+  white-space: pre-wrap; color: var(--text-dim);
+}
+
+/* Side by side text comparison */
+.text-compare { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.text-panel {
+  background: var(--bg2); border:1px solid var(--border);
+  border-radius:8px; padding:1rem;
+  font-size:0.8rem; line-height:1.7;
+  max-height: 500px; overflow-y:auto;
+  white-space: pre-wrap;
+}
+.text-panel-header {
+  font-size:0.65rem; color:var(--text-muted);
+  text-transform:uppercase; letter-spacing:0.1em;
+  margin-bottom:0.75rem; padding-bottom:0.5rem;
+  border-bottom:1px solid var(--border);
+}
+
+/* Views */
+.view { display:none; }
+.view.active { display:block; }
+
+/* Animations */
+@keyframes fadeIn { from{opacity:0} to{opacity:1} }
+@keyframes slideUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Navigation Rail -->
+  <nav class="nav">
+    <div class="nav-logo">C</div>
+    <button class="nav-btn active" data-view="analyze" title="Analyze">
+      <span>A</span><span class="nav-tooltip">Analyze</span>
+    </button>
+    <button class="nav-btn" data-view="corpus" title="Corpus">
+      <span>C</span><span class="nav-tooltip">Corpus</span>
+    </button>
+    <button class="nav-btn" data-view="stylize" title="Stylize">
+      <span>S</span><span class="nav-tooltip">Stylize</span>
+    </button>
+    <button class="nav-btn" data-view="compare" title="Compare">
+      <span>V</span><span class="nav-tooltip">Compare</span>
+    </button>
+    <button class="nav-btn" data-view="search" title="Search">
+      <span>?</span><span class="nav-tooltip">Search</span>
+    </button>
+  </nav>
+
+  <div class="main">
+
+    <!-- ANALYZE VIEW -->
+    <div class="view active" id="view-analyze">
+      <div class="page-header">
+        <h1>Analyze</h1>
+        <div class="subtitle">Extract a writer's stylometric fingerprint</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Language</label>
+          <select id="analyze-lang"></select>
+        </div>
+      </div>
+
+      <div class="upload-zone" id="analyze-upload">
+        <div class="icon">+</div>
+        <div class="label">Drop a file here or click to upload</div>
+        <div class="formats">PDF, EPUB, TXT, MD</div>
+        <input type="file" id="analyze-file" accept=".pdf,.epub,.txt,.md" hidden>
+      </div>
+
+      <div id="analyze-status" style="margin-top:1rem;font-size:0.8rem;color:var(--text-dim)"></div>
+      <div id="analyze-results" style="margin-top:1.5rem"></div>
+    </div>
+
+    <!-- CORPUS VIEW -->
+    <div class="view" id="view-corpus">
+      <div class="page-header">
+        <h1>Corpus</h1>
+        <div class="subtitle">Indexed authors and documents</div>
+      </div>
+      <div id="corpus-content">
+        <p style="color:var(--text-dim);font-size:0.8rem">Loading corpus...</p>
+      </div>
+    </div>
+
+    <!-- STYLIZE VIEW -->
+    <div class="view" id="view-stylize">
+      <div class="page-header">
+        <h1>Stylize</h1>
+        <div class="subtitle">Rewrite text in another author's voice</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Target Style (paste analysis JSON or use corpus)</label>
+          <select id="stylize-target"><option value="">-- Select from corpus --</option></select>
+        </div>
+        <div class="form-group">
+          <label>Provider</label>
+          <select id="stylize-provider"><option value="">auto</option></select>
+        </div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:1rem">
+        <label>Article to restyle</label>
+        <textarea id="stylize-input" placeholder="Paste the article text here..."></textarea>
+      </div>
+
+      <div style="display:flex;gap:0.75rem;margin-bottom:1.5rem">
+        <button class="btn" id="stylize-go">Stylize</button>
+        <button class="btn btn-secondary" id="stylize-prompt-btn">Preview Prompt</button>
+      </div>
+
+      <div id="stylize-status" style="font-size:0.8rem;color:var(--text-dim);margin-bottom:1rem"></div>
+      <div id="stylize-results"></div>
+    </div>
+
+    <!-- COMPARE VIEW -->
+    <div class="view" id="view-compare">
+      <div class="page-header">
+        <h1>Compare</h1>
+        <div class="subtitle">Side-by-side author fingerprint comparison</div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label>Author A</label>
+          <select id="compare-a"><option value="">-- Select --</option></select>
+        </div>
+        <div class="form-group" style="flex:1">
+          <label>Author B</label>
+          <select id="compare-b"><option value="">-- Select --</option></select>
+        </div>
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button class="btn" id="compare-go">Compare</button>
+        </div>
+      </div>
+
+      <div id="compare-results"></div>
+    </div>
+
+    <!-- SEARCH VIEW -->
+    <div class="view" id="view-search">
+      <div class="page-header">
+        <h1>Search</h1>
+        <div class="subtitle">Find similar writing styles in the corpus</div>
+      </div>
+
+      <div class="form-group" style="margin-bottom:1rem">
+        <label>Paste text to search for style matches</label>
+        <textarea id="search-input" placeholder="Paste text here..."></textarea>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Language</label>
+          <select id="search-lang"></select>
+        </div>
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button class="btn" id="search-go">Find Similar</button>
+        </div>
+      </div>
+
+      <div id="search-results" style="margin-top:1.5rem"></div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const API = '/api';
+
+// === Navigation ===
+document.querySelectorAll('.nav-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('view-' + btn.dataset.view).classList.add('active');
+    if (btn.dataset.view === 'corpus') loadCorpus();
+  });
+});
+
+// === Populate language dropdowns ===
+fetch(API + '/languages').then(r => r.json()).then(langs => {
+  ['analyze-lang','search-lang'].forEach(id => {
+    const sel = document.getElementById(id);
+    langs.forEach(l => {
+      const opt = document.createElement('option');
+      opt.value = l.code; opt.textContent = `${l.name} (${l.code})`;
+      if (l.code === 'en') opt.selected = true;
+      sel.appendChild(opt);
+    });
+  });
+});
+
+// === Populate providers ===
+fetch(API + '/providers').then(r => r.json()).then(providers => {
+  const sel = document.getElementById('stylize-provider');
+  providers.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    sel.appendChild(opt);
+  });
+});
+
+// === ANALYZE ===
+const uploadZone = document.getElementById('analyze-upload');
+const fileInput = document.getElementById('analyze-file');
+uploadZone.addEventListener('click', () => fileInput.click());
+uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('dragover'); });
+uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('dragover'));
+uploadZone.addEventListener('drop', e => {
+  e.preventDefault(); uploadZone.classList.remove('dragover');
+  if (e.dataTransfer.files.length) handleAnalyzeFile(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', () => { if (fileInput.files.length) handleAnalyzeFile(fileInput.files[0]); });
+
+let currentDocument = null;
+let currentProfile = null;
+
+async function handleAnalyzeFile(file) {
+  const status = document.getElementById('analyze-status');
+  const results = document.getElementById('analyze-results');
+  status.innerHTML = `<span class="spinner"></span> Ingesting ${file.name}...`;
+  results.innerHTML = '';
+
+  const form = new FormData();
+  form.append('file', file);
+  form.append('lang', document.getElementById('analyze-lang').value);
+
+  try {
+    const docRes = await fetch(API + '/ingest', { method:'POST', body: form });
+    currentDocument = await docRes.json();
+    status.innerHTML = `<span class="spinner"></span> Analyzing ${currentDocument.title} (${currentDocument.word_count.toLocaleString()} words)...`;
+
+    const profRes = await fetch(API + '/analyze', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        document_json: currentDocument,
+        lang: document.getElementById('analyze-lang').value,
+      }),
+    });
+    currentProfile = await profRes.json();
+    status.innerHTML = `Analyzed: <strong>${currentProfile.document_title}</strong>`;
+    renderAnalysis(currentProfile, results);
+  } catch(err) {
+    status.innerHTML = `<span style="color:var(--accent)">Error: ${err.message}</span>`;
+  }
+}
+
+function renderAnalysis(p, container) {
+  let html = '<div class="stats-row">';
+  html += statCard(p.word_count?.toLocaleString() || '—', 'Words');
+  if (p.readability) {
+    html += statCard(p.readability.flesch_reading_ease?.toFixed(1), 'Flesch Score');
+    html += statCard(p.readability.flesch_kincaid_grade?.toFixed(1), 'Grade Level');
+  }
+  if (p.sentences) html += statCard(p.sentences.mean_length?.toFixed(1), 'Avg Sentence');
+  if (p.vocabulary) html += statCard(p.vocabulary.unique_types?.toLocaleString(), 'Unique Words');
+  if (p.paragraphs) html += statCard((p.paragraphs.one_sentence_ratio * 100).toFixed(0) + '%', '1-Sent Paras');
+  html += '</div>';
+
+  // Charts
+  html += '<div class="split">';
+  if (p.sentences?.length_distribution) html += '<div class="card"><div class="card-header">Sentence Length</div><div class="chart" id="chart-sent"></div></div>';
+  if (p.punctuation) html += '<div class="card"><div class="card-header">Punctuation</div><div class="chart" id="chart-punct"></div></div>';
+  html += '</div><div class="split">';
+  if (p.function_words?.frequencies) html += '<div class="card"><div class="card-header">Function Words</div><div class="chart" id="chart-fw"></div></div>';
+  if (p.pos?.tag_distribution) html += '<div class="card"><div class="card-header">POS Distribution</div><div class="chart" id="chart-pos"></div></div>';
+  html += '</div>';
+
+  // Feature tables
+  if (p.contractions) {
+    html += '<div class="split">';
+    html += '<div class="card"><div class="card-header">Contractions</div>';
+    html += `<div class="stats-row">${statCard(p.contractions.rate_per_1000?.toFixed(1), 'Per 1000 Words')}${statCard(p.contractions.total?.toLocaleString(), 'Total')}</div>`;
+    if (p.contractions.top_contractions) {
+      html += '<table><thead><tr><th>Contraction</th><th class="num">Count</th></tr></thead><tbody>';
+      Object.entries(p.contractions.top_contractions).slice(0,8).forEach(([k,v]) => {
+        html += `<tr><td>${k}</td><td class="num">${v}</td></tr>`;
+      });
+      html += '</tbody></table>';
+    }
+    html += '</div>';
+
+    if (p.syntax) {
+      html += '<div class="card"><div class="card-header">Syntax &amp; Tense</div>';
+      html += `<div class="stats-row">${statCard(p.syntax.mean_tree_depth?.toFixed(2), 'Tree Depth')}`;
+      if (p.sentence_openers) html += statCard(p.sentence_openers.conjunction_start_rate?.toFixed(1) + '%', 'Conj. Starts');
+      if (p.dialogue) html += statCard((p.dialogue.quoted_word_ratio * 100).toFixed(0) + '%', 'Dialogue');
+      html += '</div>';
+      if (p.syntax.tense_distribution) {
+        html += '<table><thead><tr><th>Tense</th><th class="num">%</th></tr></thead><tbody>';
+        Object.entries(p.syntax.tense_distribution).forEach(([k,v]) => {
+          html += `<tr><td>${k}</td><td class="num">${(v*100).toFixed(1)}%</td></tr>`;
+        });
+        html += '</tbody></table>';
+      }
+      html += '</div>';
+    }
+    html += '</div>';
+  }
+
+  container.innerHTML = html;
+
+  // Render Plotly charts
+  const dark = { paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#e8e6e3',size:11,family:'JetBrains Mono'}, margin:{l:40,r:20,t:10,b:40} };
+
+  if (p.sentences?.length_distribution) {
+    const labels = p.sentences.length_distribution.map((_,i) => `${i*5}-${i*5+4}`);
+    Plotly.newPlot('chart-sent', [{x:labels, y:p.sentences.length_distribution, type:'bar', marker:{color:'#4ecca3'}}], {...dark, height:300, xaxis:{title:'Words/sentence'}}, {displayModeBar:false});
+  }
+  if (p.punctuation) {
+    const marks = ['Comma','Period','Semi','Colon','Dash','!','?','...','()','Quote'];
+    const vals = [p.punctuation.comma,p.punctuation.period,p.punctuation.semicolon,p.punctuation.colon,p.punctuation.dash,p.punctuation.exclamation,p.punctuation.question,p.punctuation.ellipsis,p.punctuation.parenthesis,p.punctuation.quotation];
+    Plotly.newPlot('chart-punct', [{x:marks,y:vals,type:'bar',marker:{color:'#e94560'},text:vals.map(v=>v.toFixed(1)),textposition:'outside'}], {...dark,height:300,yaxis:{title:'Per 1000 words'}}, {displayModeBar:false});
+  }
+  if (p.function_words?.frequencies) {
+    const words = Object.keys(p.function_words.frequencies).reverse();
+    const freqs = words.map(w => p.function_words.frequencies[w]);
+    Plotly.newPlot('chart-fw', [{y:words,x:freqs,type:'bar',orientation:'h',marker:{color:'#4ecca3'}}], {...dark,height:Math.max(300,words.length*20),xaxis:{title:'Per 1000 words'}}, {displayModeBar:false});
+  }
+  if (p.pos?.tag_distribution) {
+    const tags = Object.keys(p.pos.tag_distribution).slice(0,10);
+    const props = tags.map(t => p.pos.tag_distribution[t] * 100);
+    Plotly.newPlot('chart-pos', [{labels:tags,values:props,type:'pie',hole:0.4,marker:{colors:['#e94560','#533483','#4ecca3','#0f3460','#f0a500','#e94560','#533483','#4ecca3','#0f3460','#f0a500']},textinfo:'label+percent',textfont:{size:10}}], {...dark,height:350,showlegend:false}, {displayModeBar:false});
+  }
+}
+
+function statCard(value, label) {
+  return `<div class="stat-card"><div class="value">${value || '—'}</div><div class="label">${label}</div></div>`;
+}
+
+// === CORPUS ===
+async function loadCorpus() {
+  const el = document.getElementById('corpus-content');
+  try {
+    const res = await fetch(API + '/corpus');
+    const data = await res.json();
+    if (!data.documents?.length) {
+      el.innerHTML = '<p style="color:var(--text-dim);font-size:0.8rem">No documents indexed yet. Use <code>colophon index</code> or analyze and save from the Analyze tab.</p>';
+      return;
+    }
+    let html = '<div class="card"><div class="card-header">Authors</div><table><thead><tr><th>Author</th><th class="num">Documents</th></tr></thead><tbody>';
+    data.authors.forEach(a => { html += `<tr><td>${a.author}</td><td class="num">${a.doc_count}</td></tr>`; });
+    html += '</tbody></table></div>';
+    html += '<div class="card"><div class="card-header">Documents</div><table><thead><tr><th>Title</th><th>Author</th><th>Lang</th><th class="num">Words</th></tr></thead><tbody>';
+    data.documents.forEach(d => {
+      html += `<tr><td>${d.title?.substring(0,60) || '—'}</td><td>${d.author || '—'}</td><td>${d.lang || '—'}</td><td class="num">${d.word_count?.toLocaleString() || '—'}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+
+    // Also populate compare/stylize dropdowns
+    populateAuthorDropdowns(data.documents);
+  } catch(err) {
+    el.innerHTML = `<p style="color:var(--text-dim);font-size:0.8rem">Could not load corpus. Is pgvector running?</p>`;
+  }
+}
+
+function populateAuthorDropdowns(docs) {
+  ['compare-a','compare-b','stylize-target'].forEach(id => {
+    const sel = document.getElementById(id);
+    const current = sel.value;
+    sel.innerHTML = '<option value="">-- Select --</option>';
+    docs.forEach(d => {
+      const opt = document.createElement('option');
+      opt.value = JSON.stringify(d);
+      opt.textContent = `${d.author || 'Unknown'} — ${d.title?.substring(0,40)}`;
+      sel.appendChild(opt);
+    });
+    sel.value = current;
+  });
+}
+
+// === STYLIZE ===
+document.getElementById('stylize-go').addEventListener('click', async () => {
+  const input = document.getElementById('stylize-input').value;
+  if (!input.trim()) return;
+
+  const status = document.getElementById('stylize-status');
+  const results = document.getElementById('stylize-results');
+  const provider = document.getElementById('stylize-provider').value || null;
+
+  // Use current analyzed profile or prompt to analyze first
+  if (!currentProfile) {
+    status.innerHTML = '<span style="color:var(--accent)">Analyze a document first to set the target style, or select from corpus.</span>';
+    return;
+  }
+
+  status.innerHTML = '<span class="spinner"></span> Restyling...';
+  results.innerHTML = '';
+
+  try {
+    const res = await fetch(API + '/stylize', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        article_text: input,
+        style_profile_json: currentProfile,
+        provider: provider,
+      }),
+    });
+    const data = await res.json();
+    status.innerHTML = `Original: ${data.original_words} words | Restyled: ${data.restyled_words} words`;
+    results.innerHTML = `
+      <div class="text-compare">
+        <div class="text-panel"><div class="text-panel-header">Original</div>${escapeHtml(input)}</div>
+        <div class="text-panel"><div class="text-panel-header">Restyled</div>${escapeHtml(data.restyled)}</div>
+      </div>`;
+  } catch(err) {
+    status.innerHTML = `<span style="color:var(--accent)">Error: ${err.message}</span>`;
+  }
+});
+
+document.getElementById('stylize-prompt-btn').addEventListener('click', async () => {
+  if (!currentProfile) return;
+  const results = document.getElementById('stylize-results');
+  const res = await fetch(API + '/stylize/prompt', {
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ article_text:'', style_profile_json: currentProfile }),
+  });
+  const data = await res.json();
+  results.innerHTML = `<div class="card"><div class="card-header">System Prompt</div><div class="prompt-preview">${escapeHtml(data.prompt)}</div></div>`;
+});
+
+// === SEARCH ===
+document.getElementById('search-go').addEventListener('click', async () => {
+  const text = document.getElementById('search-input').value;
+  if (!text.trim()) return;
+  const results = document.getElementById('search-results');
+  results.innerHTML = '<span class="spinner"></span> Searching...';
+
+  try {
+    const res = await fetch(API + '/search', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        text: text,
+        lang: document.getElementById('search-lang').value,
+      }),
+    });
+    const data = await res.json();
+    if (data.error) { results.innerHTML = `<p style="color:var(--text-dim)">${data.error}</p>`; return; }
+
+    let html = '';
+    if (data.authors?.length) {
+      html += '<div class="card"><div class="card-header">Similar Authors</div><table><thead><tr><th>#</th><th>Author</th><th class="num">Docs</th><th class="num">Similarity</th></tr></thead><tbody>';
+      data.authors.forEach((a,i) => { html += `<tr><td>${i+1}</td><td>${a.author}</td><td class="num">${a.doc_count}</td><td class="num">${a.similarity.toFixed(4)}</td></tr>`; });
+      html += '</tbody></table></div>';
+    }
+    if (data.documents?.length) {
+      html += '<div class="card"><div class="card-header">Similar Documents</div><table><thead><tr><th>#</th><th>Title</th><th>Author</th><th class="num">Similarity</th></tr></thead><tbody>';
+      data.documents.forEach((d,i) => { html += `<tr><td>${i+1}</td><td>${d.title?.substring(0,50)}</td><td>${d.author||'—'}</td><td class="num">${d.similarity.toFixed(4)}</td></tr>`; });
+      html += '</tbody></table></div>';
+    }
+    if (!html) html = '<p style="color:var(--text-dim)">No results found. Index some documents first.</p>';
+    results.innerHTML = html;
+  } catch(err) {
+    results.innerHTML = `<span style="color:var(--accent)">Error: ${err.message}</span>`;
+  }
+});
+
+// === COMPARE ===
+document.getElementById('compare-go').addEventListener('click', () => {
+  const results = document.getElementById('compare-results');
+  results.innerHTML = '<p style="color:var(--text-dim);font-size:0.8rem">Compare view requires two analyzed profiles. Analyze two documents first, then compare their StyleProfiles.</p>';
+  // TODO: Implement radar chart comparison with two loaded profiles
+});
+
+// Utilities
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Init
+loadCorpus();
+</script>
+</body>
+</html>
