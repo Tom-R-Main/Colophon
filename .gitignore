@@ -11,12 +11,16 @@ build/
 .ruff_cache/
 .pytest_cache/
 .pyright/
-*.analysis.json
-*.colophon.json
+# Analysis outputs in working directory (not corpus/)
+/*.analysis.json
+/*.colophon.json
+assets/*.analysis.json
+assets/*.colophon.json
 *.restyled.md
 /report.html
 *.report.html
 assets/
+corpus/downloads/
 
 # OpenMemory - IDE/Assistant specific rules
 .windsurf/rules/openmemory.md
