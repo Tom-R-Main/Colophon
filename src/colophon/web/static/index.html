@@ -243,6 +243,27 @@ tr:hover td { background: rgba(42,46,82,0.3); }
 .view { display:none; }
 .view.active { display:block; }
 
+/* Metric help tooltips */
+.help {
+  display:inline-flex; align-items:center; justify-content:center;
+  width:14px; height:14px; border-radius:50%;
+  background:var(--border); color:var(--text-muted);
+  font-size:0.55rem; font-weight:600; cursor:help;
+  margin-left:0.35rem; position:relative; vertical-align:middle;
+  flex-shrink:0; font-family:var(--mono);
+}
+.help::after {
+  content:attr(data-tip);
+  position:absolute; bottom:calc(100% + 6px); left:50%; transform:translateX(-50%);
+  background:var(--surface2); color:var(--text); padding:6px 10px;
+  border-radius:6px; font-size:0.65rem; font-weight:300;
+  line-height:1.5; width:220px; text-align:left;
+  opacity:0; pointer-events:none; transition:opacity 0.15s;
+  z-index:100; box-shadow:0 4px 12px rgba(0,0,0,0.4);
+  white-space:normal;
+}
+.help:hover::after { opacity:1; }
+
 /* Progress bar */
 .progress-bar {
   width:100%; height:4px; background:var(--border); border-radius:2px;
@@ -607,11 +628,11 @@ function renderAnalysis(p, container) {
 
   // Charts
   html += '<div class="split">';
-  if (p.sentences?.length_distribution) html += '<div class="card"><div class="card-header">Sentence Length</div><div class="chart" id="chart-sent"></div></div>';
-  if (p.punctuation) html += '<div class="card"><div class="card-header">Punctuation</div><div class="chart" id="chart-punct"></div></div>';
+  if (p.sentences?.length_distribution) html += `<div class="card"><div class="card-header">Sentence Length${helpIcon('Sent Length')}</div><div class="chart" id="chart-sent"></div></div>`;
+  if (p.punctuation) html += `<div class="card"><div class="card-header">Punctuation${helpIcon('Comma Rate')}</div><div class="chart" id="chart-punct"></div></div>`;
   html += '</div><div class="split">';
-  if (p.function_words?.frequencies) html += '<div class="card"><div class="card-header">Function Words</div><div class="chart" id="chart-fw"></div></div>';
-  if (p.pos?.tag_distribution) html += '<div class="card"><div class="card-header">POS Distribution</div><div class="chart" id="chart-pos"></div></div>';
+  if (p.function_words?.frequencies) html += `<div class="card"><div class="card-header">Function Words<span class="help" data-tip="The most common 'glue' words (the, of, and, but...). These are unconscious habits and the strongest stylometric fingerprint — authors use them without thinking.">?</span></div><div class="chart" id="chart-fw"></div></div>`;
+  if (p.pos?.tag_distribution) html += `<div class="card"><div class="card-header">POS Distribution<span class="help" data-tip="Part-of-speech breakdown: nouns, verbs, adjectives, etc. Shows whether the author favors action (verbs) or description (adjectives).">?</span></div><div class="chart" id="chart-pos"></div></div>`;
   html += '</div>';
 
   // Feature tables
@@ -711,7 +732,7 @@ function renderAnalysis(p, container) {
 }
 
 function statCard(value, label) {
-  return `<div class="stat-card"><div class="value">${value || '—'}</div><div class="label">${label}</div></div>`;
+  return `<div class="stat-card"><div class="value">${value || '—'}</div><div class="label">${label}${helpIcon(label)}</div></div>`;
 }
 
 // === CORPUS ===
@@ -1038,7 +1059,7 @@ document.getElementById('compare-go').addEventListener('click', async () => {
       const vb = typeof b === 'number' ? b.toFixed(1) : (b || '—');
       const delta = (typeof a==='number'&&typeof b==='number') ? Math.abs(a-b) : 0;
       const cls = delta > 20 ? 'delta-high' : (delta < 2 ? 'delta-low' : '');
-      html += `<tr class="${cls}"><td>${name}</td><td class="num">${va}</td><td class="num">${vb}</td></tr>`;
+      html += `<tr class="${cls}"><td>${name}${helpIcon(name)}</td><td class="num">${va}</td><td class="num">${vb}</td></tr>`;
     });
     html += '</tbody></table></div>';
 
@@ -1061,6 +1082,48 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Metric explanations for help tooltips
+const METRIC_HELP = {
+  'Flesch Score': 'How easy to read (0-100). Higher = simpler. 70+ is newspaper level, 30- is academic.',
+  'Flesch Reading Ease': 'How easy to read (0-100). Higher = simpler. 70+ is newspaper level.',
+  'Grade Level': 'US school grade needed to understand the text. Grade 6 = newspaper, 12+ = academic.',
+  'Flesch-Kincaid Grade': 'US school grade level. Based on sentence length and syllable count.',
+  'Avg Sentence': 'Average words per sentence. Hemingway ~12, Dickens ~25, Proust ~40+.',
+  'Unique Words': 'Number of distinct word forms. Higher = richer vocabulary.',
+  '1-Sent Paras': 'Percentage of paragraphs that are a single sentence. Columnists use these for punchlines.',
+  'Words': 'Total word count of the analyzed text.',
+  'Contraction Rate': 'Contractions per 1000 words. High = informal (don\'t, it\'s). Low = formal.',
+  'Contractions': 'Contractions per 1000 words. High = informal voice.',
+  'Tree Depth': 'Average dependency tree depth. Low = simple syntax (subject-verb-object). High = nested clauses.',
+  'Conj. Starts': '% of sentences starting with But/And/So. Rule-breaking grammar as stylistic choice.',
+  'Dialogue': '% of words inside quotation marks. High = the author lets characters speak.',
+  'Dialogue %': '% of words inside quotation marks.',
+  'Comma Rate': 'Commas per 1000 words. Varies by language and style.',
+  'Comma/1000': 'Commas per 1000 words.',
+  'Dash Rate': 'Em-dashes per 1000 words. Used for parenthetical asides and dramatic pauses.',
+  'Dash/1000': 'Dashes per 1000 words.',
+  'Quote Rate': 'Quotation marks per 1000 words. Reflects how much dialogue the author uses.',
+  'Quotation/1000': 'Quotation marks per 1000 words.',
+  'Sent Length': 'Average words per sentence.',
+  'Sent Variety': 'Standard deviation of sentence lengths. Higher = more rhythmic variation.',
+  'Vocab Richness': "Yule's K — vocabulary diversity independent of text length. Lower = more diverse.",
+  "Yule's K": "Vocabulary richness independent of text length. Lower K = more diverse vocabulary.",
+  'Contractions/1000': 'Contractions per 1000 words.',
+  'Conj. Start %': '% of sentences starting with coordinating conjunctions (But, And, So).',
+  '1-Sent Para %': '% of paragraphs that are a single sentence.',
+  'Quotation/1000': 'Quotation marks per 1000 words.',
+  'Mean Sentence Length': 'Average number of words per sentence across the text.',
+  'Sentence Stdev': 'How much sentence lengths vary. High = rhythmic mixing of short and long.',
+  'Flesch Score': 'Readability score 0-100. Higher = easier to read.',
+  '1-Sent Paras': '% of paragraphs that are just one sentence.',
+};
+
+function helpIcon(metric) {
+  const tip = METRIC_HELP[metric];
+  if (!tip) return '';
+  return ` <span class="help" data-tip="${tip.replace(/"/g, '&quot;')}">?</span>`;
 }
 
 function formatText(text) {
