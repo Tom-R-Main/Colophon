@@ -225,6 +225,46 @@ def create_router(*, db_url: str | None = None) -> APIRouter:
         finally:
             session.close()
 
+    @router.delete("/corpus/{doc_id}")
+    async def delete_corpus_document(doc_id: int):
+        """Delete a document from the corpus."""
+        if not db_url:
+            return {"error": "No database configured."}
+
+        from colophon.db import get_session
+        from colophon.db.operations import aggregate_author
+        from colophon.db.schema import StyleProfileRow
+
+        session = get_session(db_url)
+        try:
+            row = session.query(StyleProfileRow).filter_by(id=doc_id).first()
+            if not row:
+                return {"error": f"Document {doc_id} not found"}
+            author = row.author
+            session.delete(row)
+            session.commit()
+            if author:
+                aggregate_author(session, author)
+            return {"deleted": doc_id}
+        finally:
+            session.close()
+
+    @router.get("/db-status")
+    async def db_status():
+        """Check if pgvector database is configured and reachable."""
+        if not db_url:
+            return {"configured": False, "message": "No --db flag. Start with: colophon serve --db postgresql://..."}
+        try:
+            from sqlalchemy import text as sa_text
+
+            from colophon.db import get_session
+            session = get_session(db_url)
+            session.execute(sa_text("SELECT 1"))
+            session.close()
+            return {"configured": True}
+        except Exception as e:
+            return {"configured": False, "message": str(e)}
+
     @router.get("/languages")
     async def list_languages():
         """Return supported language profiles."""
