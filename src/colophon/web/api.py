@@ -207,6 +207,24 @@ def create_router(*, db_url: str | None = None) -> APIRouter:
         finally:
             session.close()
 
+    @router.get("/corpus/{doc_id}/profile")
+    async def get_corpus_profile(doc_id: int):
+        """Return the full StyleProfile JSON for a corpus document."""
+        if not db_url:
+            return {"error": "No database configured."}
+
+        from colophon.db import get_session
+        from colophon.db.schema import StyleProfileRow
+
+        session = get_session(db_url)
+        try:
+            row = session.query(StyleProfileRow).filter_by(id=doc_id).first()
+            if not row:
+                return {"error": f"Document {doc_id} not found"}
+            return row.classical_features
+        finally:
+            session.close()
+
     @router.get("/languages")
     async def list_languages():
         """Return supported language profiles."""

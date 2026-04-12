@@ -701,6 +701,21 @@ function populateAuthorDropdowns(docs) {
   });
 }
 
+// === STYLIZE: load profile from corpus dropdown ===
+document.getElementById('stylize-target').addEventListener('change', async (e) => {
+  if (!e.target.value) return;
+  const doc = JSON.parse(e.target.value);
+  const status = document.getElementById('stylize-status');
+  status.innerHTML = `<span class="spinner"></span> Loading ${doc.author} style...`;
+  try {
+    const res = await fetch(API + `/corpus/${doc.id}/profile`);
+    currentProfile = await res.json();
+    status.innerHTML = `Style loaded: <strong>${doc.author}</strong> — ${doc.title?.substring(0,50)}`;
+  } catch(err) {
+    status.innerHTML = `<span style="color:var(--accent)">Error loading profile</span>`;
+  }
+});
+
 // === STYLIZE MODE TOGGLE ===
 let stylizeMode = 'restyle';
 document.querySelectorAll('.stylize-mode').forEach(btn => {
@@ -874,10 +889,101 @@ document.getElementById('search-go').addEventListener('click', async () => {
 });
 
 // === COMPARE ===
-document.getElementById('compare-go').addEventListener('click', () => {
+document.getElementById('compare-go').addEventListener('click', async () => {
+  const selA = document.getElementById('compare-a');
+  const selB = document.getElementById('compare-b');
   const results = document.getElementById('compare-results');
-  results.innerHTML = '<p style="color:var(--text-dim);font-size:0.8rem">Compare view requires two analyzed profiles. Analyze two documents first, then compare their StyleProfiles.</p>';
-  // TODO: Implement radar chart comparison with two loaded profiles
+
+  if (!selA.value || !selB.value) {
+    results.innerHTML = '<p style="color:var(--text-dim)">Select two documents to compare.</p>';
+    return;
+  }
+
+  const docA = JSON.parse(selA.value);
+  const docB = JSON.parse(selB.value);
+  results.innerHTML = '<span class="spinner"></span> Loading profiles...';
+
+  try {
+    const [resA, resB] = await Promise.all([
+      fetch(API + `/corpus/${docA.id}/profile`).then(r => r.json()),
+      fetch(API + `/corpus/${docB.id}/profile`).then(r => r.json()),
+    ]);
+
+    // Build radar chart data
+    const metrics = [];
+    const valsA = [];
+    const valsB = [];
+
+    if (resA.readability && resB.readability) {
+      metrics.push('Flesch Score'); valsA.push(resA.readability.flesch_reading_ease); valsB.push(resB.readability.flesch_reading_ease);
+      metrics.push('Grade Level'); valsA.push(resA.readability.flesch_kincaid_grade * 5); valsB.push(resB.readability.flesch_kincaid_grade * 5);
+    }
+    if (resA.sentences && resB.sentences) {
+      metrics.push('Sent Length'); valsA.push(resA.sentences.mean_length * 3); valsB.push(resB.sentences.mean_length * 3);
+      metrics.push('Sent Variety'); valsA.push(resA.sentences.stdev_length * 5); valsB.push(resB.sentences.stdev_length * 5);
+    }
+    if (resA.vocabulary && resB.vocabulary) {
+      metrics.push('Vocab Richness'); valsA.push(resA.vocabulary.yules_k); valsB.push(resB.vocabulary.yules_k);
+    }
+    if (resA.punctuation && resB.punctuation) {
+      metrics.push('Comma Rate'); valsA.push(resA.punctuation.comma); valsB.push(resB.punctuation.comma);
+      metrics.push('Dash Rate'); valsA.push(resA.punctuation.dash * 10); valsB.push(resB.punctuation.dash * 10);
+      metrics.push('Quote Rate'); valsA.push(resA.punctuation.quotation); valsB.push(resB.punctuation.quotation);
+    }
+    if (resA.contractions && resB.contractions) {
+      metrics.push('Contractions'); valsA.push(resA.contractions.rate_per_1000 * 3); valsB.push(resB.contractions.rate_per_1000 * 3);
+    }
+    if (resA.sentence_openers && resB.sentence_openers) {
+      metrics.push('Conj. Starts'); valsA.push(resA.sentence_openers.conjunction_start_rate * 5); valsB.push(resB.sentence_openers.conjunction_start_rate * 5);
+    }
+    if (resA.paragraphs && resB.paragraphs) {
+      metrics.push('1-Sent Paras'); valsA.push(resA.paragraphs.one_sentence_ratio * 100); valsB.push(resB.paragraphs.one_sentence_ratio * 100);
+    }
+    if (resA.dialogue && resB.dialogue) {
+      metrics.push('Dialogue %'); valsA.push(resA.dialogue.quoted_word_ratio * 100); valsB.push(resB.dialogue.quoted_word_ratio * 100);
+    }
+    if (resA.syntax && resB.syntax) {
+      metrics.push('Tree Depth'); valsA.push(resA.syntax.mean_tree_depth * 10); valsB.push(resB.syntax.mean_tree_depth * 10);
+    }
+
+    let html = '<div class="card"><div class="card-header">Style Comparison</div><div class="chart" id="chart-compare"></div></div>';
+
+    // Feature diff table
+    html += '<div class="card"><div class="card-header">Feature Breakdown</div><table><thead><tr><th>Metric</th><th class="num">' + (docA.author||'A') + '</th><th class="num">' + (docB.author||'B') + '</th></tr></thead><tbody>';
+    const rawMetrics = [
+      ['Flesch Reading Ease', resA.readability?.flesch_reading_ease, resB.readability?.flesch_reading_ease],
+      ['Grade Level', resA.readability?.flesch_kincaid_grade, resB.readability?.flesch_kincaid_grade],
+      ['Mean Sentence Length', resA.sentences?.mean_length, resB.sentences?.mean_length],
+      ['Sentence Stdev', resA.sentences?.stdev_length, resB.sentences?.stdev_length],
+      ["Yule's K", resA.vocabulary?.yules_k, resB.vocabulary?.yules_k],
+      ['Comma/1000', resA.punctuation?.comma, resB.punctuation?.comma],
+      ['Dash/1000', resA.punctuation?.dash, resB.punctuation?.dash],
+      ['Quotation/1000', resA.punctuation?.quotation, resB.punctuation?.quotation],
+      ['Contractions/1000', resA.contractions?.rate_per_1000, resB.contractions?.rate_per_1000],
+      ['Conj. Start %', resA.sentence_openers?.conjunction_start_rate, resB.sentence_openers?.conjunction_start_rate],
+      ['1-Sent Para %', resA.paragraphs ? (resA.paragraphs.one_sentence_ratio*100).toFixed(1)+'%' : '—', resB.paragraphs ? (resB.paragraphs.one_sentence_ratio*100).toFixed(1)+'%' : '—'],
+      ['Dialogue %', resA.dialogue ? (resA.dialogue.quoted_word_ratio*100).toFixed(1)+'%' : '—', resB.dialogue ? (resB.dialogue.quoted_word_ratio*100).toFixed(1)+'%' : '—'],
+      ['Tree Depth', resA.syntax?.mean_tree_depth, resB.syntax?.mean_tree_depth],
+    ];
+    rawMetrics.forEach(([name, a, b]) => {
+      const va = typeof a === 'number' ? a.toFixed(1) : (a || '—');
+      const vb = typeof b === 'number' ? b.toFixed(1) : (b || '—');
+      html += `<tr><td>${name}</td><td class="num">${va}</td><td class="num">${vb}</td></tr>`;
+    });
+    html += '</tbody></table></div>';
+
+    results.innerHTML = html;
+
+    // Render radar chart
+    const dark = { paper_bgcolor:'rgba(0,0,0,0)', plot_bgcolor:'rgba(0,0,0,0)', font:{color:'#e8e6e3',size:11,family:'JetBrains Mono'}, margin:{l:60,r:60,t:40,b:40} };
+    Plotly.newPlot('chart-compare', [
+      { type:'scatterpolar', r:[...valsA, valsA[0]], theta:[...metrics, metrics[0]], fill:'toself', name:docA.author||'A', fillcolor:'rgba(233,69,96,0.15)', line:{color:'#e94560'} },
+      { type:'scatterpolar', r:[...valsB, valsB[0]], theta:[...metrics, metrics[0]], fill:'toself', name:docB.author||'B', fillcolor:'rgba(78,204,163,0.15)', line:{color:'#4ecca3'} },
+    ], { ...dark, height:450, polar:{bgcolor:'rgba(0,0,0,0)', radialaxis:{visible:true,color:'#55546a'}, angularaxis:{color:'#8b8a96'}}, showlegend:true, legend:{x:0,y:1.1,orientation:'h'} }, {displayModeBar:false});
+
+  } catch(err) {
+    results.innerHTML = `<span style="color:var(--accent)">Error: ${err.message}</span>`;
+  }
 });
 
 // Utilities
