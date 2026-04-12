@@ -229,6 +229,30 @@ The database uses HNSW indexes for approximate nearest-neighbor search — fast 
 - `style_profiles` — per-document vectors + full JSON features
 - `author_profiles` — aggregated mean vectors across all documents by an author
 
+### Pre-Built Corpus
+
+Colophon ships with pre-analyzed stylometric profiles for 36 public domain authors (43 works, 4.6 million words, 8 languages). Load them into pgvector with the build script:
+
+```bash
+docker compose up -d
+python scripts/build_corpus.py
+```
+
+This indexes all authors instantly (analysis JSONs are pre-computed in `corpus/`). Users get style search across world literature out of the box.
+
+| Language | Authors |
+|----------|---------|
+| **English** | Mark Twain, Charles Dickens, Jane Austen, Edgar Allan Poe, Herman Melville, Oscar Wilde, Arthur Conan Doyle, Jack London, Louisa May Alcott, Henry James, Walt Whitman, Emily Dickinson, Frederick Douglass, Booker T. Washington, W.E.B. Du Bois, Lewis Carroll, H.P. Lovecraft, Robert Louis Stevenson, H.G. Wells, Henry David Thoreau, Fyodor Dostoevsky (translation) |
+| **French** | Victor Hugo, Alexandre Dumas, Gustave Flaubert, Marcel Proust |
+| **German** | Brothers Grimm, Johann Wolfgang von Goethe, Franz Kafka |
+| **Italian** | Dante Alighieri, Niccolò Machiavelli, Giovanni Boccaccio |
+| **Spanish** | Miguel de Cervantes |
+| **Portuguese** | Machado de Assis |
+| **Polish** | Henryk Sienkiewicz |
+| **Russian** | Leo Tolstoy |
+
+All texts sourced from [Project Gutenberg](https://www.gutenberg.org/).
+
 ## Web UI
 
 Colophon includes a local web interface for visual analysis, corpus management, and AI-powered writing.
