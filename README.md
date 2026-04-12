@@ -78,6 +78,7 @@ colophon report <analysis.json>           # Interactive HTML report (Plotly)
 colophon stylize <article> <style.json>   # Rewrite article in the analyzed style
 colophon index <file> --author "Name"     # Store style profile in pgvector
 colophon search-style <file>              # Find similar authors/documents
+colophon serve                            # Start the web UI (port 8099)
 ```
 
 ### `ingest`
@@ -228,6 +229,30 @@ The database uses HNSW indexes for approximate nearest-neighbor search — fast 
 - `style_profiles` — per-document vectors + full JSON features
 - `author_profiles` — aggregated mean vectors across all documents by an author
 
+## Web UI
+
+Colophon includes a local web interface for visual analysis, corpus management, and AI-powered writing.
+
+```bash
+pip install -e ".[web]"
+colophon serve                                    # http://localhost:8099
+colophon serve --db postgresql://...              # with pgvector corpus
+colophon serve --port 3000 --host 0.0.0.0         # custom bind
+```
+
+### Views
+
+| View | What It Does |
+|------|-------------|
+| **Analyze** | Drag-and-drop file upload, runs all 12 analyzers, renders interactive Plotly charts. "Save to Corpus" button indexes the result into pgvector with an author name. |
+| **Corpus** | Browse indexed authors and documents. Shows word counts, languages, document counts per author. |
+| **Stylize** | Two modes: **Restyle Existing** (paste an article, rewrite it in a target style) and **Write New** (enter a topic, generate original content in a computed voice). Provider-agnostic — works with any configured LLM. |
+| **Compare** | Side-by-side author fingerprint comparison with radar charts. |
+| **Search** | Paste text, find the most stylistically similar authors and documents in the corpus via pgvector nearest-neighbor search. |
+| **Settings** | Configure API keys for Anthropic, OpenAI, Gemini, and OpenRouter. Keys are saved to `.env` and auto-detected by the stylize/generate commands. |
+
+The frontend is a single HTML file with no build step — no npm, no React, no bundler. Served by FastAPI with Plotly.js from CDN.
+
 ## Multilingual
 
 Colophon supports 18 languages with language-specific function word lists, contraction detection, and quote mark conventions.
@@ -281,6 +306,7 @@ pip install -e ".[analysis]"     # + spaCy, textstat, NLTK
 pip install -e ".[report]"       # + Plotly, Jinja2
 pip install -e ".[stylize]"      # + Anthropic SDK, python-dotenv
 pip install -e ".[embeddings]"   # + pgvector, SQLAlchemy, psycopg2
+pip install -e ".[web]"          # + FastAPI, uvicorn (local web UI)
 pip install -e ".[all]"          # Everything above
 pip install -e ".[ocr]"          # + OCRmyPDF (needs system Tesseract)
 pip install -e ".[neural]"       # + sentence-transformers, torch (future)
@@ -301,7 +327,7 @@ python -m spacy download fr_core_news_sm   # French
 ```text
 colophon/
 ├── src/colophon/
-│   ├── cli.py                    # Typer CLI (7 commands)
+│   ├── cli.py                    # Typer CLI (8 commands)
 │   ├── ingestion/                # PDF, EPUB, TXT/MD extraction + normalization
 │   ├── analysis/                 # 12 deterministic analyzers + chunked pipeline
 │   │   ├── pipeline.py           # Orchestrator (auto-chunks large documents)
@@ -319,6 +345,9 @@ colophon/
 │   ├── db/                       # pgvector storage layer
 │   │   ├── schema.py             # SQLAlchemy models
 │   │   └── operations.py         # Index, search, aggregate
+│   ├── web/                      # Local web UI
+│   │   ├── api.py                # FastAPI routes (wraps CLI functions)
+│   │   └── static/index.html     # Single-page frontend (6 views)
 │   ├── lang/                     # 18 language profiles
 │   └── models/                   # Pydantic models (Document, StyleProfile)
 ├── docker-compose.yml            # pgvector container
