@@ -157,7 +157,7 @@ colophon stylize article.txt royko.analysis.json -s royko.colophon.json
 colophon stylize article.txt royko.analysis.json --show-prompt
 
 # Explicit provider and model
-colophon stylize article.txt royko.analysis.json --provider openai --llm-model gpt-4o
+colophon stylize article.txt royko.analysis.json --provider openai --llm-model gpt-5.6-sol
 ```
 
 Supported providers: Anthropic, OpenAI, Gemini, OpenRouter.
