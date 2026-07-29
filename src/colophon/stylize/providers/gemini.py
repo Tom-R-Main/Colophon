@@ -8,7 +8,7 @@ import httpx
 class GeminiProvider:
     name: str = "gemini"
 
-    def __init__(self, *, api_key: str, model: str = "gemini-2.5-flash"):
+    def __init__(self, *, api_key: str, model: str = "gemini-3.6-flash"):
         self.api_key = api_key
         self.model = model
 
@@ -22,7 +22,7 @@ class GeminiProvider:
             json={
                 "systemInstruction": {"parts": [{"text": system}]},
                 "contents": [{"parts": [{"text": user}]}],
-                "generationConfig": {"maxOutputTokens": 4096, "temperature": 0.7},
+                "generationConfig": {"maxOutputTokens": 4096},
             },
             timeout=120.0,
         )

@@ -10,10 +10,10 @@ from colophon.stylize.providers.base import Provider
 
 # Provider registry: env var -> (module, class, default model)
 PROVIDERS: dict[str, tuple[str, str, str]] = {
-    "ANTHROPIC_API_KEY": ("colophon.stylize.providers.anthropic", "AnthropicProvider", "claude-sonnet-4-20250514"),
-    "OPENAI_API_KEY": ("colophon.stylize.providers.openai", "OpenAIProvider", "gpt-4o"),
-    "OPENROUTER_API_KEY": ("colophon.stylize.providers.openrouter", "OpenRouterProvider", "anthropic/claude-sonnet-4"),
-    "GEMINI_API_KEY": ("colophon.stylize.providers.gemini", "GeminiProvider", "gemini-2.5-flash"),
+    "ANTHROPIC_API_KEY": ("colophon.stylize.providers.anthropic", "AnthropicProvider", "claude-sonnet-5"),
+    "OPENAI_API_KEY": ("colophon.stylize.providers.openai", "OpenAIProvider", "gpt-5.6-sol"),
+    "OPENROUTER_API_KEY": ("colophon.stylize.providers.openrouter", "OpenRouterProvider", "anthropic/claude-sonnet-5"),
+    "GEMINI_API_KEY": ("colophon.stylize.providers.gemini", "GeminiProvider", "gemini-3.6-flash"),
 }
 
 

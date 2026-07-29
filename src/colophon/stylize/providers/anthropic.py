@@ -6,7 +6,7 @@ from __future__ import annotations
 class AnthropicProvider:
     name: str = "anthropic"
 
-    def __init__(self, *, api_key: str, model: str = "claude-sonnet-4-20250514"):
+    def __init__(self, *, api_key: str, model: str = "claude-sonnet-5"):
         self.api_key = api_key
         self.model = model
 
@@ -20,4 +20,7 @@ class AnthropicProvider:
             system=system,
             messages=[{"role": "user", "content": user}],
         )
-        return message.content[0].text
+        text = [block.text for block in message.content if block.type == "text"]
+        if not text:
+            raise ValueError("Anthropic response did not contain text")
+        return "\n".join(text)
