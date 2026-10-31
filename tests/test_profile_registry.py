@@ -501,3 +501,109 @@ def test_intermediate_link_checks_outer_and_nested_git_metadata(repo, tmp_path, 
     else:
         configure(registry, {"voice": outer})
         assert_code("profile_not_private", api.resolve_profile, "voice", registry)
+
+
+@pytest.mark.parametrize("kind", ["registry", "profile"])
+@pytest.mark.parametrize("ancestry", ["original", "repo_alias", "directory_alias"])
+def test_case_alias_of_tracked_file_is_private_rejection(repo, tmp_path, profile_data, kind, ancestry):
+    folder = repo / "Mixed" if ancestry == "directory_alias" else repo
+    folder.mkdir(exist_ok=True)
+    source = folder / "writer.json" if kind == "profile" else tmp_path / "writer.json"
+    source.write_text(json.dumps(profile_data))
+    registry = configure(
+        folder / "registry.json" if kind == "registry" else tmp_path / "registry.json", {"voice": source}
+    )
+    selected = registry if kind == "registry" else source
+    (repo / ".gitignore").write_text("*.json\n")
+    git(repo, "add", "--force", str(selected.relative_to(repo)))
+    alias = selected.with_name(selected.name.upper())
+    if ancestry == "repo_alias":
+        alias = repo.with_name(repo.name.upper()) / alias.relative_to(repo)
+    elif ancestry == "directory_alias":
+        alias = repo / folder.name.swapcase() / alias.name
+    if not alias.exists() or not alias.samefile(selected):
+        pytest.skip("Filesystem does not alias case variants")
+    if kind == "registry":
+        assert_code("registry_not_private", api.list_profiles, selected)
+        assert_code("registry_not_private", api.list_profiles, alias)
+    else:
+        configure(registry, {"voice": selected})
+        assert_code("profile_not_private", api.resolve_profile, "voice", registry)
+        configure(registry, {"voice": alias})
+        assert_code("profile_not_private", api.resolve_profile, "voice", registry)
+
+
+@pytest.mark.parametrize("kind", ["registry", "profile"])
+def test_case_alias_of_tracked_intermediate_link_is_rejected(repo, tmp_path, profile_data, kind):
+    source = tmp_path / "writer.json"
+    source.write_text(json.dumps(profile_data))
+    registry = configure(tmp_path / "registry.json", {"voice": source})
+    middle = repo / "middle"
+    middle.symlink_to(registry if kind == "registry" else source)
+    (repo / ".gitignore").write_text("*\n")
+    git(repo, "add", "--force", "middle")
+    alias = repo / "MIDDLE"
+    if not alias.exists() or not os.path.samestat(alias.lstat(), middle.lstat()):
+        pytest.skip("Filesystem does not alias case variants")
+    outer = tmp_path / "outer"
+    outer.symlink_to(alias)
+    if kind == "registry":
+        assert_code("registry_not_private", api.list_profiles, outer)
+    else:
+        configure(registry, {"voice": outer})
+        assert_code("profile_not_private", api.resolve_profile, "voice", registry)
+
+
+@pytest.mark.parametrize("kind", ["registry", "profile"])
+def test_distinct_case_different_files_remain_private_when_ignored(repo, tmp_path, profile_data, kind):
+    source = repo / "writer.json" if kind == "profile" else tmp_path / "writer.json"
+    source.write_text(json.dumps(profile_data))
+    registry = configure(
+        repo / "registry.json" if kind == "registry" else tmp_path / "registry.json", {"voice": source}
+    )
+    selected = registry if kind == "registry" else source
+    alias = selected.with_name(selected.name.upper())
+    if alias.exists() and alias.samefile(selected):
+        pytest.skip("Filesystem does not support distinct case-different files")
+    alias.write_bytes(selected.read_bytes())
+    assert not alias.samefile(selected)
+    (repo / ".gitignore").write_text("*.json\n*.JSON\n")
+    git(repo, "add", "--force", str(selected.relative_to(repo)))
+    if kind == "registry":
+        assert_code("registry_not_private", api.list_profiles, selected)
+        assert api.list_profiles(alias)["status"] == "configured"
+    else:
+        configure(registry, {"voice": selected})
+        assert_code("profile_not_private", api.resolve_profile, "voice", registry)
+        configure(registry, {"voice": alias})
+        assert api.resolve_profile("voice", registry)["profile_path"] == str(alias)
+
+
+@pytest.mark.parametrize("identity", ["same_inode", "distinct", "links_same_target", "missing_candidate"])
+def test_targeted_tracking_candidates_use_real_local_identity(tmp_path, monkeypatch, identity):
+    # Isolate Git's candidate query from identity comparison using real local
+    # files/links on every platform; no mocked case-insensitive filesystem.
+    selected = tmp_path / "selected.json"
+    candidate = tmp_path / "candidate.json"
+    target = tmp_path / "target"
+    target.write_text(SENTINEL)
+    if identity == "links_same_target":
+        selected.symlink_to(target)
+        candidate.symlink_to(target)
+    else:
+        selected.write_text(SENTINEL)
+        if identity == "same_inode":
+            os.link(selected, candidate)
+        elif identity == "distinct":
+            candidate.write_text(SENTINEL)
+    calls = []
+
+    def candidates(root, *arguments):
+        calls.append((root, arguments))
+        return subprocess.CompletedProcess(arguments, 0, stdout=b"candidate.json\0", stderr=b"")
+
+    monkeypatch.setattr(api, "_git", candidates)
+    assert api._tracked_file(selected, tmp_path) is (identity == "same_inode")
+    assert calls == [(tmp_path, (
+        "ls-files", "--cached", "-z", "--", ":(literal)selected.json", ":(icase,literal)selected.json"
+    ))]

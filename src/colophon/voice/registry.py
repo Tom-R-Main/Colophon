@@ -89,7 +89,7 @@ def _git(root: Path, *arguments: str) -> subprocess.CompletedProcess[bytes]:
     try:
         return subprocess.run(
             [
-                "git", "--no-optional-locks", *(["--literal-pathspecs"] if arguments[0] == "ls-files" else []),
+                "git", "--no-optional-locks",
                 "-c", "core.fsmonitor=false",
                 "-C", str(root), *arguments,
             ],
@@ -99,6 +99,38 @@ def _git(root: Path, *arguments: str) -> subprocess.CompletedProcess[bytes]:
             env=environment,
         )
     except (OSError, subprocess.TimeoutExpired):
+        raise _error("privacy_check_failed") from None
+
+
+def _tracked_file(path: Path, root: Path) -> bool:
+    relative = str(path.relative_to(root))
+    # Git's index matching is case-sensitive even on a case-insensitive volume.
+    # Query only this name's candidates; an icase match is not proof of identity
+    # on Linux, where two case-different names can be separate private files.
+    tracked = _git(
+        root, "ls-files", "--cached", "-z", "--", f":(literal){relative}", f":(icase,literal){relative}"
+    )
+    if tracked.returncode != 0 or (tracked.stdout and not tracked.stdout.endswith(b"\0")):
+        raise _error("privacy_check_failed")
+    try:
+        selected = path.lstat()
+        for raw in tracked.stdout.split(b"\0")[:-1]:
+            candidate = Path(os.fsdecode(raw))
+            if candidate.is_absolute() or ".." in candidate.parts:
+                raise _error("privacy_check_failed")
+            if str(candidate) == relative:
+                return True
+            try:
+                identity = (root / candidate).lstat()
+            except FileNotFoundError:
+                # A stale, differently-cased index entry has no local identity.
+                continue
+            # lstat compares link identities as well as regular file identities;
+            # following both links would confuse distinct links to one target.
+            if os.path.samestat(selected, identity):
+                return True
+        return False
+    except OSError:
         raise _error("privacy_check_failed") from None
 
 
@@ -116,10 +148,7 @@ def _check_location(path: Path, code: str) -> None:
         except OSError:
             raise _error("privacy_check_failed") from None
         relative = str(path.relative_to(parent))
-        tracked = _git(parent, "ls-files", "--cached", "-z", "--", relative)
-        if tracked.returncode != 0:
-            raise _error("privacy_check_failed")
-        if tracked.stdout:
+        if _tracked_file(path, parent):
             raise _error(code)
         ignored = _git(parent, "check-ignore", "--no-index", "-q", "--", relative)
         if ignored.returncode == 1:
