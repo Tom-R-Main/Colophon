@@ -7,7 +7,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Any, Callable, Optional
 
 import typer
 
@@ -15,6 +15,8 @@ from colophon.voice.models import TraitCorrection, VoiceProfile, VoiceTrait
 
 app = typer.Typer(help="Extract, inspect and evaluate evidence-linked author voice profiles.", no_args_is_help=True)
 corpus_app = typer.Typer(help="Validate local corpus sources and evaluation splits.", no_args_is_help=True)
+profiles_app = typer.Typer(help="Discover explicitly configured private local profiles.", no_args_is_help=True)
+app.add_typer(profiles_app, name="profiles")
 
 
 def _write(value: str, output: Path | None) -> None:
@@ -40,6 +42,40 @@ def _json(value: object, output: Path | None) -> None:
 def _fail(error: Exception) -> None:
     typer.echo(f"Error: {error}", err=True)
     raise typer.Exit(1)
+
+
+def _registry_response(action: Callable[[], dict[str, Any]]) -> None:
+    from colophon.voice.registry import RegistryError
+
+    try:
+        _json(action(), None)
+    except RegistryError as error:
+        _json(
+            {
+                "schema_version": 1,
+                "status": "error",
+                "error": {"code": error.code, "message": error.message},
+                "recovery": error.recovery,
+            },
+            None,
+        )
+        raise typer.Exit(1)
+
+
+@profiles_app.command("list")
+def list_local_profiles(registry: Optional[Path] = typer.Option(None, "--registry")) -> None:
+    """List configured aliases, without opening profile contents or calling a model."""
+    from colophon.voice.registry import list_profiles
+
+    _registry_response(lambda: list_profiles(registry))
+
+
+@profiles_app.command("resolve")
+def resolve_local_profile(name: str, registry: Optional[Path] = typer.Option(None, "--registry")) -> None:
+    """Validate one local VoiceProfile and return its path and parsed-byte identity."""
+    from colophon.voice.registry import resolve_profile
+
+    _registry_response(lambda: resolve_profile(name, registry))
 
 
 @corpus_app.command("validate")

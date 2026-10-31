@@ -29,6 +29,7 @@ Drive the actual public commands and read back their artifacts:
 
 | Promise | Boundary and decisive expectation | Coverage |
 |---|---|---|
+| Local named profiles | Read-only explicit registry; external or untracked ignored files only; resolve validates `VoiceProfile` and hashes parsed bytes; discovery emits no source text; receipt identity matches selection | `tests/test_profile_registry.py`, `tests/test_profile_registry_cli.py` |
 | Documented first run | Execute the README's marked commands in isolation; inspect training IDs, held-out exclusions, report evidence and exact receipt hashes; all public local links resolve | `tests/test_readme.py` |
 | Publication boundary | Forced-added private/corpus/output paths fail before bytes are read; staged/CI scans report paths without disclosing matched values; synthetic examples remain eligible | `tests/test_publication.py` and `scripts/check_publication.py --tracked` |
 | Correct measurements | Different function-word identities yield different vectors; punctuation alone preserves lexical denominators; three short paragraphs remain three; chunk options preserve measurements | `tests/test_measurements.py` uses real spaCy documents and independent Delta algebra |

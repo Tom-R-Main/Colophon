@@ -36,6 +36,8 @@ You now have a JSON profile, a readable evidence report, and a prompt you can gi
 
 The synthetic writers test the machinery. They aren't a voice-quality benchmark.
 
+For an agent that needs a reusable local voice, configure an alias using [local profile discovery](docs/agent-usage.md#local-profile-discovery). Profiles are user-supplied private files; Colophon ships no named-author library.
+
 ## What goes into a profile
 
 A profile keeps several kinds of evidence together:
