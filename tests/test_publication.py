@@ -19,6 +19,10 @@ def git(root, *args):
 @pytest.fixture
 def repo(tmp_path):
     git(tmp_path, "init", "--quiet")
+    # The fixture must not inherit a developer's global ignored filenames.
+    excludes = tmp_path / ".git" / "publication-empty-excludes"
+    excludes.write_text("")
+    git(tmp_path, "config", "core.excludesFile", str(excludes))
     return tmp_path
 
 
@@ -91,13 +95,22 @@ def test_deleted_staged_path_is_not_read(repo):
     assert publication.check(repo, "staged", []) == []
 
 
-def test_symlink_target_is_not_opened(repo):
+def test_symlink_target_is_not_opened(repo, monkeypatch):
     target = repo / ".env"
     target.write_text("opaque")
     (repo / "alias.py").symlink_to(target.name)
     git(repo, "add", "alias.py")
-    assert "symlink" in publication.check(repo, "tracked", [])[0]
-    assert "symlink" in publication.check(repo, "worktree", [])[0]
+
+    def no_content_read(path):
+        pytest.fail("Symlink and forbidden target bytes must not be opened")
+
+    monkeypatch.setattr(Path, "read_bytes", no_content_read)
+    tracked = publication.check(repo, "tracked", [])
+    assert len(tracked) == 1 and tracked[0].startswith("alias.py:") and "symlink" in tracked[0]
+    worktree = publication.check(repo, "worktree", [])
+    assert len(worktree) == 2
+    assert any(line.startswith("alias.py:") and "symlink" in line for line in worktree)
+    assert any(line.startswith(".env:") and "forbidden publication path" in line for line in worktree)
 
 
 def test_optional_overlap_reports_candidate_only(tmp_path):
