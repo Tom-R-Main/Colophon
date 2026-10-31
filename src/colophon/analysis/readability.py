@@ -7,7 +7,7 @@ from colophon.models.features import ReadabilityFeatures
 
 def compute_readability(text: str, *, lang: str | None = "en") -> ReadabilityFeatures:
     """Compute readability scores for a text."""
-    import textstat
+    from textstat import textstat
 
     textstat.set_lang(lang or "en")
 

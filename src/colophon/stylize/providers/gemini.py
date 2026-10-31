@@ -28,4 +28,10 @@ class GeminiProvider:
         )
         response.raise_for_status()
         data = response.json()
-        return data["candidates"][0]["content"]["parts"][0]["text"]
+        candidate = data["candidates"][0]
+        if candidate.get("finishReason") == "MAX_TOKENS":
+            raise RuntimeError("The model output was truncated; no complete rewrite was returned")
+        text = "".join(part.get("text", "") for part in candidate["content"]["parts"])
+        if not text.strip():
+            raise RuntimeError("The provider returned no text")
+        return text

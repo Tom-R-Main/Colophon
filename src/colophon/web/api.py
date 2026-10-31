@@ -172,8 +172,8 @@ def create_router(*, db_url: str | None = None) -> APIRouter:
 
         session = get_session(db_url)
         try:
-            authors = search_authors(session, vector, limit=body.top)
-            documents = search_similar(session, vector, limit=body.top)
+            authors = search_authors(session, vector, limit=body.top, lang=body.lang)
+            documents = search_similar(session, vector, limit=body.top, lang=body.lang)
             return {"authors": authors, "documents": documents}
         finally:
             session.close()
@@ -242,10 +242,14 @@ def create_router(*, db_url: str | None = None) -> APIRouter:
                 return {"error": f"Document {doc_id} not found"}
             author = row.author
             session.delete(row)
-            session.commit()
+            session.flush()
             if author:
-                aggregate_author(session, author)
+                aggregate_author(session, author, commit=False)
+            session.commit()
             return {"deleted": doc_id}
+        except Exception:
+            session.rollback()
+            raise
         finally:
             session.close()
 
@@ -401,7 +405,7 @@ def create_router(*, db_url: str | None = None) -> APIRouter:
             f"Topic: {body.topic}"
         )
 
-        result = stylize_text(system_prompt, user_message, provider=body.provider, model=body.model)
+        result = stylize_text(system_prompt, user_message, provider=body.provider, model=body.model, mode="generate")
         return {"generated": result, "word_count": len(result.split())}
 
     return router

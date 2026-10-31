@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from colophon.analysis.context import lexical_tokens
 from colophon.models.features import DialogueFeatures
 
 
@@ -23,7 +24,7 @@ def compute_dialogue(
         if token.text in qmarks:
             in_quote = not in_quote
             continue
-        if token.is_space or token.is_punct:
+        if not lexical_tokens([token]):
             continue
         if in_quote:
             quoted_words += 1

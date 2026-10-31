@@ -1,0 +1,5 @@
+[
+  {"id": "faithful", "variant": "control", "input": "The library opened at 9. The notice said, \"Come inside.\"", "output": "At 9, the library opened. The notice said, \"Come inside.\"", "exemplars": ["A small example paragraph from an unrelated writer contains no borrowed phrasing here."]},
+  {"id": "changed-number", "variant": "negative-control", "input": "The library opened at 9. The notice said, \"Come inside.\"", "output": "The library opened at 11. The notice said, \"Come inside.\""},
+  {"id": "copied", "variant": "negative-control", "input": "A person waited for a boat.", "output": "The gate was locked but the watchman was already making tea beside the empty dock.", "exemplars": ["The gate was locked but the watchman was already making tea beside the empty dock."]}
+]

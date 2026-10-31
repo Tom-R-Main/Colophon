@@ -33,4 +33,10 @@ class OpenAIProvider:
         )
         response.raise_for_status()
         data = response.json()
-        return data["choices"][0]["message"]["content"]
+        choice = data["choices"][0]
+        if choice.get("finish_reason") == "length":
+            raise RuntimeError("The model output was truncated; no complete rewrite was returned")
+        text = choice["message"]["content"]
+        if not isinstance(text, str) or not text.strip():
+            raise RuntimeError("The provider returned no text")
+        return text

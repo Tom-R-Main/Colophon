@@ -136,6 +136,17 @@ class StyleProfile(BaseModel):
     segment_id: int | None = None
     computed_at: datetime = Field(default_factory=datetime.now)
     word_count: int = 0
+    schema_version: str = "legacy-1"
+    analyzer_version: str = "unknown"
+    language: str | None = None
+    spacy_model: str | None = None
+    spacy_version: str | None = None
+    model_version: str | None = None
+    normalization_version: str = "unknown"
+    vector_schema: str | None = None
+    source_hash: str | None = None
+    availability: dict[str, str] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
 
     readability: ReadabilityFeatures | None = None
     sentences: SentenceFeatures | None = None

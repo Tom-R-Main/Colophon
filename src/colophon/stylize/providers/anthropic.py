@@ -20,4 +20,9 @@ class AnthropicProvider:
             system=system,
             messages=[{"role": "user", "content": user}],
         )
-        return message.content[0].text
+        if message.stop_reason == "max_tokens":
+            raise RuntimeError("The model output was truncated; no complete rewrite was returned")
+        text = "".join(block.text for block in message.content if block.type == "text")
+        if not text.strip():
+            raise RuntimeError("The provider returned no text")
+        return text

@@ -2,11 +2,17 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 
+@lru_cache(maxsize=2)
 def load_spacy_model(model_name: str = "en_core_web_sm") -> Any:
-    """Load a spaCy model with a helpful error if not installed."""
+    """Reuse at most two local linguistic pipelines; parsed documents are not cached.
+
+    Call ``load_spacy_model.cache_clear()`` after changing an installed model in
+    a long-lived process. Measurements record the actual loaded model metadata.
+    """
     try:
         import spacy
         return spacy.load(model_name)

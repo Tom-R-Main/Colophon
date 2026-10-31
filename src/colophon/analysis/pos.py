@@ -5,13 +5,14 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from colophon.analysis.context import lexical_tokens
 from colophon.models.features import POSFeatures
 
 
 def compute_pos(text: str, nlp: Any) -> POSFeatures:
     """Compute POS tag distribution and derived ratios."""
     doc = nlp(text)
-    tokens = [t for t in doc if not t.is_space]
+    tokens = lexical_tokens(doc)
     total = len(tokens)
 
     if total == 0:

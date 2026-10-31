@@ -1,18 +1,9 @@
-"""Burrows' Delta authorship attribution algorithm.
-
-Vendored implementation (~50 lines of core logic) to avoid faststylometry's
-NumPy<2.0 constraint.
-
-Algorithm:
-1. Build a combined vocabulary from all texts (top N most frequent words)
-2. For each text, compute z-scores of word frequencies
-3. Delta between two texts = mean(|z_A - z_B|) across all features
-4. Lower delta = more similar style
-"""
+"""Reference-fitted Burrows' Delta with document-level reference variation."""
 
 from __future__ import annotations
 
-from collections import Counter
+import re
+from collections import Counter, defaultdict
 
 import numpy as np
 
@@ -20,86 +11,65 @@ from colophon.models.document import Corpus, Document
 from colophon.models.features import ComparisonResult
 
 
-def compare(
-    corpus: Corpus,
-    unknown: Document,
-    *,
-    n_features: int = 300,
-) -> ComparisonResult:
-    """Compare an unknown document against a corpus of known authors.
+def compare(corpus: Corpus, unknown: Document, *, n_features: int = 300) -> ComparisonResult:
+    """Fit vocabulary/scales only on reference documents and rank author centroids.
 
-    The corpus should have documents with .author set. Documents by the same
-    author are combined into a single profile.
+    Reference documents receive equal weight. Scores are distances, not author
+    probabilities; this closed-set ranking does not assert unknown-author rejection.
     """
-    # Group corpus documents by author
-    authors: dict[str, list[Document]] = {}
-    for doc in corpus.documents:
-        author = doc.author or "Unknown"
-        authors.setdefault(author, []).append(doc)
-
-    # Build combined vocabulary from all texts
-    all_tokens: list[str] = []
-    for doc in corpus.documents:
-        all_tokens.extend(_tokenize(doc.text))
-    all_tokens.extend(_tokenize(unknown.text))
-
-    # Top N most frequent words as features
-    vocab = Counter(all_tokens)
-    feature_words = [word for word, _ in vocab.most_common(n_features)]
-
-    # Build frequency vectors per author (combined across their documents)
-    author_vectors: dict[str, np.ndarray] = {}
-    for author, docs in authors.items():
-        combined_text = " ".join(d.text for d in docs)
-        author_vectors[author] = _frequency_vector(combined_text, feature_words)
-
-    # Build frequency vector for the unknown text
-    unknown_vector = _frequency_vector(unknown.text, feature_words)
-
-    # Compute z-scores across all author vectors
-    all_vectors = np.array(list(author_vectors.values()))
-    means = all_vectors.mean(axis=0)
-    stds = all_vectors.std(axis=0)
-    stds[stds == 0] = 1  # avoid division by zero
-
-    # Z-score normalize
-    z_authors = {
-        author: (vec - means) / stds
-        for author, vec in author_vectors.items()
-    }
-    z_unknown = (unknown_vector - means) / stds
-
-    # Compute Burrows' Delta: mean absolute deviation
-    deltas: list[tuple[str, float]] = []
-    for author, z_vec in z_authors.items():
-        delta = float(np.mean(np.abs(z_unknown - z_vec)))
-        deltas.append((author, round(delta, 4)))
-
-    # Sort by delta ascending (lowest = most similar)
-    deltas.sort(key=lambda x: x[1])
-
+    if n_features < 1:
+        raise ValueError("n_features must be positive")
+    if not corpus.documents:
+        raise ValueError("Reference corpus is empty")
+    if not _tokenize(unknown.text):
+        raise ValueError("Unknown document has no lexical words")
+    tokens: Counter[str] = Counter()
+    seen_ids: set[str] = set()
+    for document in corpus.documents:
+        if not document.author or not document.author.strip():
+            raise ValueError("Every reference document needs an author")
+        if document.id in seen_ids:
+            raise ValueError("Duplicate reference document content")
+        seen_ids.add(document.id)
+        document_tokens = _tokenize(document.text)
+        if not document_tokens:
+            raise ValueError(f"Reference document has no lexical words: {document.title}")
+        tokens.update(document_tokens)
+    if unknown.id in seen_ids:
+        raise ValueError("Unknown document is also present in the reference corpus")
+    if len({document.author for document in corpus.documents}) < 2:
+        raise ValueError("At least two reference authors are needed")
+    # Tie-breaking by word identity makes corpus iteration order irrelevant.
+    words = [word for word, _ in sorted(tokens.items(), key=lambda item: (-item[1], item[0]))[:n_features]]
+    if len(words) < 2:
+        raise ValueError("At least two reference features are needed")
+    reference = np.array([_frequency_vector(document.text, words) for document in corpus.documents])
+    means = reference.mean(axis=0)
+    stds = reference.std(axis=0)
+    stds[stds == 0] = 1.0
+    standardized = (reference - means) / stds
+    author_documents: dict[str, list[np.ndarray]] = defaultdict(list)
+    for document, vector in zip(corpus.documents, standardized):
+        assert document.author is not None  # checked before fitting
+        author_documents[document.author].append(vector)
+    query = (_frequency_vector(unknown.text, words) - means) / stds
+    ranked = [
+        (author, round(float(np.abs(query - np.mean(vectors, axis=0)).mean()), 4))
+        for author, vectors in author_documents.items()
+    ]
+    ranked.sort(key=lambda result: (result[1], result[0]))
     return ComparisonResult(
-        unknown_document_id=unknown.id,
-        unknown_document_title=unknown.title,
-        ranked_authors=deltas,
-        n_features=n_features,
+        unknown_document_id=unknown.id, unknown_document_title=unknown.title,
+        ranked_authors=ranked, n_features=len(words),
     )
 
 
 def _tokenize(text: str) -> list[str]:
-    """Simple whitespace + lowering tokenizer for frequency analysis."""
-    return [
-        w.lower().strip(".,;:!?\"'()-")
-        for w in text.split()
-        if len(w.strip(".,;:!?\"'()-")) > 0
-    ]
+    """Stable lexical units for the standalone Delta baseline, independent of spaCy."""
+    return re.findall(r"[^\W_]+(?:['’][^\W_]+)*", text.lower(), flags=re.UNICODE)
 
 
 def _frequency_vector(text: str, feature_words: list[str]) -> np.ndarray:
-    """Build a normalized frequency vector for the given feature words."""
     tokens = _tokenize(text)
-    total = len(tokens)
-    if total == 0:
-        return np.zeros(len(feature_words))
     counts = Counter(tokens)
-    return np.array([counts.get(w, 0) / total for w in feature_words])
+    return np.array([counts[word] / len(tokens) if tokens else 0.0 for word in feature_words])

@@ -10,7 +10,7 @@ from colophon.models.features import PunctuationFeatures
 def compute_punctuation(text: str, word_count: int) -> PunctuationFeatures:
     """Compute punctuation rates per 1000 words."""
     if word_count == 0:
-        return PunctuationFeatures(comma=0)
+        return PunctuationFeatures(comma=0, dash=0)
 
     scale = 1000 / word_count
 

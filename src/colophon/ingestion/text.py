@@ -28,7 +28,12 @@ def ingest_text(
     else:
         segments = _segment_text(text)
 
-    return Document.from_text(text=text, source_path=path, segments=segments)
+    return Document.from_text(
+        text=text,
+        source_path=path,
+        segments=segments,
+        metadata={"extractor": "text-2", "normalization_version": "2", "paragraph_quality": "explicit"},
+    )
 
 
 def _segment_markdown(text: str) -> list[Segment]:
@@ -69,9 +74,11 @@ def _segment_text(text: str) -> list[Segment]:
         segments.append(Segment(index=i, title=None, text=block, char_offset_start=start, char_offset_end=end))
         offset = end
 
-    return segments if segments else [
-        Segment(index=0, title=None, text=text, char_offset_start=0, char_offset_end=len(text))
-    ]
+    return (
+        segments
+        if segments
+        else [Segment(index=0, title=None, text=text, char_offset_start=0, char_offset_end=len(text))]
+    )
 
 
 def _segment_by_pattern(text: str, pattern: str) -> list[Segment]:

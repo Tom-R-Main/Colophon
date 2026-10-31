@@ -1,4 +1,4 @@
-"""Document ingestion — PDF, EPUB, TXT, MD."""
+"""Document ingestion — PDF, EPUB, HTML, TXT, MD."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from colophon.models.document import Document
 
-SUPPORTED_SUFFIXES = {".pdf", ".epub", ".txt", ".md"}
+SUPPORTED_SUFFIXES = {".pdf", ".epub", ".html", ".htm", ".txt", ".md"}
 
 
 def ingest(path: Path, *, no_segment: bool = False, segment_pattern: str | None = None) -> Document:
@@ -23,6 +23,9 @@ def ingest(path: Path, *, no_segment: bool = False, segment_pattern: str | None 
     elif suffix == ".epub":
         from colophon.ingestion.epub import ingest_epub
         return ingest_epub(path, no_segment=no_segment, segment_pattern=segment_pattern)
+    elif suffix in {".html", ".htm"}:
+        from colophon.ingestion.html import ingest_html
+        return ingest_html(path, no_segment=no_segment, segment_pattern=segment_pattern)
     else:
         from colophon.ingestion.text import ingest_text
         return ingest_text(path, no_segment=no_segment, segment_pattern=segment_pattern)

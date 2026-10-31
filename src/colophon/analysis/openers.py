@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from colophon.analysis.context import lexical_tokens
 from colophon.models.features import SentenceOpenerFeatures
 
 
@@ -18,7 +19,7 @@ def compute_openers(text: str, nlp: Any) -> SentenceOpenerFeatures:
     total_sents = 0
 
     for sent in doc.sents:
-        tokens = [t for t in sent if not t.is_space]
+        tokens = lexical_tokens(sent)
         if not tokens:
             continue
         total_sents += 1

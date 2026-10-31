@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 
+from colophon.lang import get_profile
 from colophon.models.features import StyleProfile
 
 # Canonical POS tags (Universal Dependencies) — fixed order for vector stability
@@ -14,6 +15,12 @@ UNIVERSAL_POS = [
 ]
 
 VECTOR_DIM = 128
+VECTOR_SCHEMA = "classical-2"
+# Changes to coordinates, scales, masks or language vocabularies require a new schema.
+AVAILABILITY_ORDER = (
+    "readability", "sentences", "vocabulary", "function_words", "pos", "ngrams",
+    "punctuation", "contractions", "sentence_openers", "paragraphs", "dialogue", "syntax",
+)
 
 
 def style_profile_to_vector(profile: StyleProfile) -> list[float]:
@@ -25,7 +32,7 @@ def style_profile_to_vector(profile: StyleProfile) -> list[float]:
     - dims 11-15: vocabulary richness
     - dims 16-32: POS tag proportions (17 universal tags)
     - dims 33-35: POS ratios (adj/noun, adverb density, verb density)
-    - dims 36-65: top 30 function word frequencies
+    - dims 36-65: first 30 words in the versioned language vocabulary
     - dims 66-75: punctuation rates
     - dims 76: contraction rate
     - dims 77: conjunction start rate
@@ -33,8 +40,31 @@ def style_profile_to_vector(profile: StyleProfile) -> list[float]:
     - dims 81: dialogue ratio
     - dims 82-84: syntax complexity
     - dims 85-87: tense distribution
-    - dims 88-127: zero-padded
+    - dims 88-99: availability masks in AVAILABILITY_ORDER
+    - dims 100-127: zero-padded
     """
+    if (
+        profile.schema_version != "2" or profile.analyzer_version != "2"
+        or profile.vector_schema != VECTOR_SCHEMA or not profile.language
+    ):
+        raise ValueError(
+            "Legacy or incompatible style profile; re-analyze source text before vectorizing (classical-2)"
+        )
+    language = get_profile(profile.language)
+    available = {}
+    for name in AVAILABILITY_ORDER:
+        state = profile.availability.get(name, "not_requested")
+        value = getattr(profile, name)
+        if state == "measured" and value is None:
+            raise ValueError(f"{name} marked measured but no measurement is present")
+        if value is not None and state != "measured":
+            raise ValueError(f"{name} has values without measured availability; re-analyze the source")
+        available[name] = state == "measured"
+    if not any(available[name] for name in AVAILABILITY_ORDER if name != "ngrams"):
+        raise ValueError("No measured numeric features are available for vectorization")
+    if profile.function_words is not None:
+        if set(profile.function_words.frequencies) != set(language.function_words):
+            raise ValueError("Incomplete or incompatible canonical function-word vocabulary; re-analyze the source")
     features: list[float] = []
 
     # Readability (6 dims)
@@ -86,12 +116,12 @@ def style_profile_to_vector(profile: StyleProfile) -> list[float]:
     else:
         features.extend([0.0] * 3)
 
-    # Function words — top 30 by canonical sort (30 dims)
-    if profile.function_words and profile.function_words.frequencies:
-        sorted_words = sorted(profile.function_words.frequencies.keys())[:30]
-        for word in sorted_words:
-            features.append(profile.function_words.frequencies.get(word, 0.0))
-        features.extend([0.0] * max(0, 30 - len(sorted_words)))
+    # Fixed language-specific coordinates, independent of each document's keys/ranks.
+    if profile.function_words is not None:
+        canonical_words = language.function_words[:30]
+        for word in canonical_words:
+            features.append(profile.function_words.frequencies[word])
+        features.extend([0.0] * max(0, 30 - len(canonical_words)))
     else:
         features.extend([0.0] * 30)
 
@@ -145,11 +175,17 @@ def style_profile_to_vector(profile: StyleProfile) -> list[float]:
     else:
         features.extend([0.0] * 3)
 
+    # A measured zero remains distinguishable from an unavailable measurement.
+    features.extend(float(available[name]) for name in AVAILABILITY_ORDER)
+
     # Pad or truncate to VECTOR_DIM
     if len(features) < VECTOR_DIM:
         features.extend([0.0] * (VECTOR_DIM - len(features)))
     elif len(features) > VECTOR_DIM:
         features = features[:VECTOR_DIM]
+
+    if not all(math.isfinite(value) for value in features):
+        raise ValueError("Style vectors require finite measurements")
 
     # Normalize: log-scale high-magnitude values, then L2 normalize
     features = _normalize_vector(features)

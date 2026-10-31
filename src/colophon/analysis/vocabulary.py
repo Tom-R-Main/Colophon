@@ -6,13 +6,14 @@ import math
 from collections import Counter
 from typing import Any
 
+from colophon.analysis.context import lexical_tokens
 from colophon.models.features import VocabularyFeatures
 
 
 def compute_vocabulary(text: str, nlp: Any) -> VocabularyFeatures:
     """Compute vocabulary richness metrics."""
     doc = nlp(text)
-    tokens = [t.lower_ for t in doc if not t.is_punct and not t.is_space]
+    tokens = [t.lower_ for t in lexical_tokens(doc)]
 
     if not tokens:
         return VocabularyFeatures(

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 
 from colophon.ingestion.normalize import normalize_text
-from colophon.models.document import Document, Segment
+from colophon.models.document import Document, DocumentBlock, Segment
 
 
 def ingest_epub(
@@ -42,6 +43,9 @@ def ingest_epub(
     items_by_id = {item.get_id(): item for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT)}
 
     chapters: list[tuple[str | None, str]] = []
+    blocks: list[DocumentBlock] = []
+    pieces: list[str] = []
+    offset = 0
     for item_id in spine_ids:
         item = items_by_id.get(item_id)
         if item is None:
@@ -50,7 +54,42 @@ def ingest_epub(
         if isinstance(content, bytes):
             content = content.decode("utf-8", errors="replace")
         soup = BeautifulSoup(content, "html.parser")
-        text = "\n".join(p.get_text() for p in soup.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6"]))
+        chapter_pieces = []
+        for node in soup.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6", "li"]):
+            text_part = normalize_text(node.get_text())
+            if not text_part:
+                continue
+            # XHTML supplies real paragraph boundaries; inline wrapping does not.
+            text_part = " ".join(text_part.split())
+            if pieces:
+                offset += 2
+            furniture = node.find_parent(["nav", "header", "footer"]) is not None
+            quoted = node.find_parent("blockquote") is not None
+            kind = (
+                "furniture"
+                if furniture
+                else "quotation"
+                if quoted
+                else "heading"
+                if node.name != "p" and node.name != "li"
+                else "paragraph"
+            )
+            attribution = "quoted" if quoted else "unknown" if furniture else "author"
+            blocks.append(
+                DocumentBlock(
+                    id=hashlib.sha256(f"{item_id}:{len(blocks)}:{text_part}".encode()).hexdigest()[:16],
+                    kind=kind,
+                    attribution=attribution,
+                    text=text_part,
+                    char_offset_start=offset,
+                    char_offset_end=offset + len(text_part),
+                    source_item=item_id,
+                )
+            )
+            offset += len(text_part)
+            pieces.append(text_part)
+            chapter_pieces.append(text_part)
+        text = "\n\n".join(chapter_pieces)
         if text.strip():
             # Try to extract chapter title from first heading
             heading = soup.find(["h1", "h2", "h3"])
@@ -58,7 +97,7 @@ def ingest_epub(
             chapters.append((chapter_title, text.strip()))
 
     # Combine all text
-    full_text = normalize_text("\n\n".join(text for _, text in chapters))
+    full_text = "\n\n".join(pieces)
 
     if no_segment:
         segments = [Segment(index=0, title=None, text=full_text, char_offset_start=0, char_offset_end=len(full_text))]
@@ -76,16 +115,19 @@ def ingest_epub(
             except ValueError:
                 start = offset
             end = start + len(ch_text)
-            segments.append(Segment(
-                index=i,
-                title=ch_title,
-                text=ch_text,
-                char_offset_start=start,
-                char_offset_end=end,
-            ))
+            segments.append(
+                Segment(
+                    index=i,
+                    title=ch_title,
+                    text=ch_text,
+                    char_offset_start=start,
+                    char_offset_end=end,
+                )
+            )
             offset = end
 
     metadata["chapter_count"] = str(len(chapters))
+    metadata.update({"extractor": "epub-2", "normalization_version": "2", "paragraph_quality": "explicit"})
     return Document.from_text(
         text=full_text,
         source_path=path,
@@ -93,6 +135,7 @@ def ingest_epub(
         author=author,
         segments=segments,
         metadata=metadata,
+        blocks=blocks,
     )
 
 

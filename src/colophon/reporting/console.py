@@ -147,8 +147,8 @@ def _print_function_words(profile: StyleProfile) -> None:
     table.add_column("Frequency", justify="right")
     table.add_column("", min_width=20)
 
-    max_freq = max(fw.frequencies.values()) if fw.frequencies else 1
-    for word, freq in fw.frequencies.items():
+    max_freq = max(fw.frequencies.values()) or 1
+    for word, freq in sorted(fw.frequencies.items(), key=lambda item: (-item[1], item[0]))[:fw.top_n]:
         bar_len = int((freq / max_freq) * 20)
         bar = "\u2588" * bar_len
         table.add_row(word, f"{freq:.1f}", bar)

@@ -134,10 +134,8 @@ def merge_function_word_features(partials: list[dict], top_n: int = 30) -> Funct
     if total_tokens == 0:
         return FunctionWordFeatures(frequencies={}, top_n=top_n)
 
-    freqs = {w: round((count / total_tokens) * 1000, 2) for w, count in combined.items() if count > 0}
-    sorted_freqs = dict(sorted(freqs.items(), key=lambda x: x[1], reverse=True)[:top_n])
-
-    return FunctionWordFeatures(frequencies=sorted_freqs, top_n=top_n)
+    freqs = {w: round((count / total_tokens) * 1000, 2) for w, count in sorted(combined.items())}
+    return FunctionWordFeatures(frequencies=freqs, top_n=top_n)
 
 
 def merge_ngram_features(partials: list[dict], top_n: int = 50) -> NGramFeatures:
