@@ -44,7 +44,7 @@ Keep a JSON manifest beside its source files. Each entry names the writer whose 
 
 Use `train` pieces to build profiles. Reserve `dev` for threshold or method choices and `test` for the final comparison. Revisions, excerpts and chunks of one original piece belong to the same `work_id` and split. Profile construction currently requires one independent work per selected document; split a collection into original articles, rather than presenting chapters as independent works.
 
-Sources must remain inside the manifest directory. TXT, MD, HTML, EPUB, PDF and existing `.colophon.json` documents are accepted. Exact duplicates are rejected. Cross-split near-duplicate/excerpt overlap is checked using five-word shingles and conservative containment thresholds; that check cannot guarantee the absence of every paraphrased or short-text leak.
+Sources must remain inside the manifest directory. TXT, MD, HTML, EPUB, PDF and existing `.colophon.json` documents are accepted. Duplicate checks cover both full source text and included author prose. Author prose is casefolded and whitespace-collapsed for comparison, so different excluded headings, quotations or padding cannot hide an exact duplicate. Cross-split near-duplicate/excerpt overlap is checked on both views using five-word shingles and conservative containment thresholds; that check cannot guarantee the absence of every paraphrased or short-text leak. Comparison does not change evidence offsets or the stored source views.
 
 Additional fields:
 
@@ -59,7 +59,7 @@ Additional fields:
 
 By default, paired double/guillemet and selected East Asian quotation spans are excluded from author measurements. Apostrophes are not treated as speech delimiters. Headings, furniture, quotation blocks and non-author-attributed blocks are excluded first, so quotes in those regions cannot consume later author prose. Unclosed author quotes are conservatively excluded through the end and flagged. For a reviewed corpus, `explicit_only` preserves the writer's own quoted labels; attributed speech then needs explicit block ownership or span exclusions. Unmarked quotations, complex nesting, OCR errors or editorial changes may still require manual review.
 
-EPUB paragraphs and headings retain their source item and exact normalized offsets. PDF items retain page/region provenance, but physical blocks are not automatically certified prose paragraphs. PDF paragraph statistics and structural traits abstain until reviewed. Exact offsets identify normalized text; they are not offsets into raw PDF bytes.
+EPUB paragraphs and headings retain their source item and exact normalized offsets. Nested list/paragraph markup emits each prose run once, preserving child boundaries and quotation ownership. The corrected EPUB extractor is `epub-3`; re-ingest affected EPUB sources and rebuild profiles rather than reusing earlier normalized offsets. PDF items retain page/region provenance, but physical blocks are not automatically certified prose paragraphs. PDF paragraph statistics and structural traits abstain until reviewed. Exact offsets identify normalized text; they are not offsets into raw PDF bytes.
 
 HTML ingestion preserves logical blocks and DOM locators without running scripts or fetching resources. It recognizes semantic article roots and a legacy font/BR layout. Navigation, notes, promotional regions, attributed epigraphs and recognizable code/data regions are separate from prose. These are structure-based heuristics, so inspect unusual pages and the recorded warnings.
 

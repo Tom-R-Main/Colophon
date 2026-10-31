@@ -124,13 +124,15 @@ def _shingles(text: str) -> set[tuple[str, ...]]:
 
 
 def validate_loaded(loaded: list[LoadedDocument]) -> None:
-    """Exact duplicates always fail; near-duplicate overlap across splits fails."""
+    """Check full sources and included author prose for duplicates and split leakage."""
     if not loaded:
         raise ValueError("Corpus has no included documents")
     ids: set[str] = set()
     content_ids: dict[str, str] = {}
+    author_content_ids: dict[str, str] = {}
     works: dict[str, str] = {}
     shingles = []
+    author_shingles = []
     for item in loaded:
         entry = item.entry
         if entry.id in ids:
@@ -152,6 +154,22 @@ def validate_loaded(loaded: list[LoadedDocument]) -> None:
                 if overlap >= 0.85:
                     raise ValueError(f"Near-duplicate text crosses splits: {entry.id!r}, {previous.entry.id!r}")
         shingles.append((item, current))
+        # Analysis consumes the masked author view. Compare its canonical prose
+        # as well, so excluded material cannot hide leakage or affect identity.
+        # Canonicalization is comparison-only: evidence keeps its source offsets.
+        author_canonical = " ".join(item.author_document.text.casefold().split())
+        author_digest = hashlib.sha256(author_canonical.encode()).hexdigest()
+        if author_digest in author_content_ids:
+            raise ValueError(f"Duplicate author text in {entry.id!r} and {author_content_ids[author_digest]!r}")
+        author_content_ids[author_digest] = entry.id
+        author_current = _shingles(author_canonical)
+        for previous, other in author_shingles:
+            denominator = min(len(author_current), len(other))
+            if entry.split != previous.entry.split and denominator >= 20:
+                overlap = len(author_current & other) / denominator
+                if overlap >= 0.85:
+                    raise ValueError(f"Near-duplicate author text crosses splits: {entry.id!r}, {previous.entry.id!r}")
+        author_shingles.append((item, author_current))
 
 
 def load_corpus(path: Path) -> list[LoadedDocument]:

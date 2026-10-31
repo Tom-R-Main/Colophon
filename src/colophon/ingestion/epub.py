@@ -5,9 +5,51 @@ from __future__ import annotations
 import hashlib
 import re
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from colophon.ingestion.normalize import normalize_text
 from colophon.models.document import Document, DocumentBlock, Segment
+
+if TYPE_CHECKING:
+    from bs4.element import Tag
+
+
+def _logical_blocks(root: Tag) -> list[tuple[Tag, str]]:
+    """Emit inline runs once, splitting at nested and sibling block boundaries."""
+    from bs4.element import CData, NavigableString, Tag
+
+    prose_tags = {"p", "h1", "h2", "h3", "h4", "h5", "h6", "li", "blockquote"}
+    boundaries = prose_tags | {
+        "address", "article", "aside", "dd", "div", "dl", "dt", "fieldset", "figcaption", "figure",
+        "footer", "form", "header", "hr", "main", "nav", "ol", "pre", "section", "table", "tbody",
+        "td", "tfoot", "th", "thead", "tr", "ul",
+    }
+    records: list[tuple[Tag, str]] = []
+    buffer: list[str] = []
+
+    def flush(owner: Tag | None) -> None:
+        text = " ".join(normalize_text("".join(buffer)).split())
+        buffer.clear()
+        if text and owner is not None:
+            records.append((owner, text))
+
+    def walk(node: Tag, owner: Tag | None) -> None:
+        boundary = node.name in boundaries
+        if boundary:
+            flush(owner)
+        current_owner = node if node.name in prose_tags else owner
+        for child in node.children:
+            if isinstance(child, Tag):
+                walk(child, current_owner)
+            # Match get_text's visible string types; comments and script/style
+            # strings do not become prose merely because they are inside a list.
+            elif type(child) in (NavigableString, CData) and current_owner is not None:
+                buffer.append(str(child))
+        if boundary:
+            flush(current_owner)
+
+    walk(root, None)
+    return records
 
 
 def ingest_epub(
@@ -55,23 +97,18 @@ def ingest_epub(
             content = content.decode("utf-8", errors="replace")
         soup = BeautifulSoup(content, "html.parser")
         chapter_pieces = []
-        for node in soup.find_all(["p", "h1", "h2", "h3", "h4", "h5", "h6", "li"]):
-            text_part = normalize_text(node.get_text())
-            if not text_part:
-                continue
-            # XHTML supplies real paragraph boundaries; inline wrapping does not.
-            text_part = " ".join(text_part.split())
+        for node, text_part in _logical_blocks(soup):
             if pieces:
                 offset += 2
             furniture = node.find_parent(["nav", "header", "footer"]) is not None
-            quoted = node.find_parent("blockquote") is not None
+            quoted = node.name == "blockquote" or node.find_parent("blockquote") is not None
             kind = (
                 "furniture"
                 if furniture
                 else "quotation"
                 if quoted
                 else "heading"
-                if node.name != "p" and node.name != "li"
+                if node.name in {"h1", "h2", "h3", "h4", "h5", "h6"}
                 else "paragraph"
             )
             attribution = "quoted" if quoted else "unknown" if furniture else "author"
@@ -127,7 +164,7 @@ def ingest_epub(
             offset = end
 
     metadata["chapter_count"] = str(len(chapters))
-    metadata.update({"extractor": "epub-2", "normalization_version": "2", "paragraph_quality": "explicit"})
+    metadata.update({"extractor": "epub-3", "normalization_version": "2", "paragraph_quality": "explicit"})
     return Document.from_text(
         text=full_text,
         source_path=path,
