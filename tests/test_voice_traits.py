@@ -1,5 +1,6 @@
 import hashlib
 import json
+from typing import Literal
 
 import pytest
 
@@ -12,7 +13,7 @@ from colophon.voice.profile import build_voice_profile, validate_evidence
 from colophon.voice.rhetoric import author_evidence, extract_traits, rhetoric_features
 
 
-def loaded(text, identifier="one", *, split="train", language="en", metadata=None):
+def loaded(text, identifier="one", *, split: Literal["train", "dev", "test"] = "train", language="en", metadata=None):
     entry = CorpusEntry(
         id=identifier, path=f"{identifier}.txt", author="Writer", work_id=identifier, language=language, split=split
     )
@@ -62,11 +63,16 @@ def test_profiles_use_only_author_training_documents(profile_and_sources):
     assert result.profile_id == profile.profile_id
     assert "heldout" not in result.model_dump_json()
     summary = result.numerical["sentences.mean_length"]
-    values = [doc.measurement.sentences.mean_length for doc in result.documents]
+    values = []
+    measured = []
+    for doc in result.documents:
+        assert doc.measurement.sentences is not None
+        assert doc.measurement.function_words is not None
+        values.append(doc.measurement.sentences.mean_length)
+        measured.append(doc.measurement.function_words.frequencies["i"])
     assert summary.mean == pytest.approx(sum(values) / len(values))
     assert summary.documents == 3
     word = result.numerical["function_words.i"]
-    measured = [doc.measurement.function_words.frequencies["i"] for doc in result.documents]
     assert word.mean == pytest.approx(sum(measured) / len(measured))
     assert word.documents == 3
     assert "function_words.i" in build_voice_prompt(result, "numeric")

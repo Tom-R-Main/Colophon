@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import math
+from typing import Literal
 
 import numpy as np
 import pytest
@@ -51,6 +52,7 @@ def test_function_word_identity_is_a_fixed_coordinate():
     assert len(a) == len(b) == 128
     assert a != b
     assert sum(x * y for x, y in zip(a, b)) < 0.01
+    assert first.function_words is not None
     reordered = first.model_copy(update={
         "function_words": FunctionWordFeatures(
             frequencies=dict(reversed(list(first.function_words.frequencies.items()))),
@@ -291,7 +293,10 @@ def test_paragraph_projection_excludes_nonbody_blocks(real_pipeline):
     text = "\n".join([heading, body, furniture])
     blocks = []
     start = 0
-    for index, (kind, value) in enumerate([("heading", heading), ("paragraph", body), ("furniture", furniture)]):
+    regions: list[tuple[Literal["heading", "paragraph", "furniture"], str]] = [
+        ("heading", heading), ("paragraph", body), ("furniture", furniture),
+    ]
+    for index, (kind, value) in enumerate(regions):
         blocks.append(DocumentBlock(
             id=str(index), kind=kind, text=value, char_offset_start=start, char_offset_end=start + len(value),
         ))

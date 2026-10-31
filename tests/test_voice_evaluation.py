@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import replace
+from typing import Literal
 
 import pytest
 
@@ -14,7 +15,7 @@ from colophon.voice.manifest import LoadedDocument
 from colophon.voice.models import CorpusEntry
 
 
-def loaded(doc_id, author, text, split="train", topic="topic"):
+def loaded(doc_id, author, text, split: Literal["train", "dev", "test"] = "train", topic="topic"):
     entry = CorpusEntry(id=doc_id, author=author, work_id=doc_id, path=doc_id + ".txt", split=split, topic=topic)
     document = Document.from_text(text, entry.path, author=author)
     digest = hashlib.sha256(text.encode()).hexdigest()

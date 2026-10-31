@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import replace
+from typing import Literal
 
 import pytest
 
@@ -15,7 +16,7 @@ from colophon.voice.profile import build_voice_profile
 from colophon.voice.profile_validation import evaluate_profile
 
 
-def source(identifier, text, *, split="train", metadata=None, work_id=None):
+def source(identifier, text, *, split: Literal["train", "dev", "test"] = "train", metadata=None, work_id=None):
     entry = CorpusEntry(
         id=identifier,
         path=f"{identifier}.txt",
