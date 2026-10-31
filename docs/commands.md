@@ -10,6 +10,7 @@ Use `colophon --help`, `colophon voice --help`, or `colophon COMMAND --help` for
 | `corpus validate` | Checks a local manifest, source ownership, independent works and split separation |
 | `voice extract` | Builds an author profile from included training works, with optional annotations/corrections |
 | `voice inspect` | Reads a profile; `--evidence` includes supporting source passages |
+| `voice profiles list / resolve` | Discovers explicitly configured local aliases; resolves a selected private `VoiceProfile` to schema-checked metadata and a byte hash, without source passages or model calls |
 | `voice export` | Exports JSON or Markdown; `--all-evidence` expands Markdown evidence |
 | `voice prompt` | Exports one of four prompt modes; `--task generate` prepares new-writing guidance; `--receipt` requires `-o` and checks saved bytes |
 | `voice evaluate-profile` | Compares one fixed profile with unseen pieces; reports stability, not authorship probability |
