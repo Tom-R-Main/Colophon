@@ -5,13 +5,14 @@ from __future__ import annotations
 from collections import Counter
 from typing import Any
 
+from colophon.analysis.context import lexical_tokens
 from colophon.models.features import NGramFeatures
 
 
 def compute_ngrams(text: str, nlp: Any, top_n: int = 50) -> NGramFeatures:
     """Compute word and character n-gram profiles."""
     doc = nlp(text)
-    tokens = [t.lower_ for t in doc if not t.is_punct and not t.is_space]
+    tokens = [t.lower_ for t in lexical_tokens(doc)]
 
     word_bigrams = _top_ngrams(_word_ngrams(tokens, 2), top_n)
     word_trigrams = _top_ngrams(_word_ngrams(tokens, 3), top_n)

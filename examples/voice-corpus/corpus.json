@@ -1,0 +1,13 @@
+{
+  "schema_version": "1",
+  "name": "Synthetic CLI demonstration; not a voice-quality benchmark",
+  "documents": [
+    {"id": "rowan-harbor", "path": "rowan-harbor.txt", "author": "Rowan (synthetic)", "work_id": "rowan-harbor", "genre": "column", "topic": "harbor", "split": "train"},
+    {"id": "rowan-library", "path": "rowan-library.txt", "author": "Rowan (synthetic)", "work_id": "rowan-library", "genre": "column", "topic": "library", "split": "train"},
+    {"id": "rowan-garden", "path": "rowan-garden.txt", "author": "Rowan (synthetic)", "work_id": "rowan-garden", "genre": "column", "topic": "garden", "split": "test"},
+    {"id": "mina-observatory", "path": "mina-observatory.txt", "author": "Mina (synthetic)", "work_id": "mina-observatory", "genre": "exposition", "topic": "observatory", "split": "train"},
+    {"id": "mina-railway", "path": "mina-railway.txt", "author": "Mina (synthetic)", "work_id": "mina-railway", "genre": "exposition", "topic": "railway", "split": "train"},
+    {"id": "mina-stream", "path": "mina-stream.txt", "author": "Mina (synthetic)", "work_id": "mina-stream", "genre": "exposition", "topic": "stream", "split": "test"},
+    {"id": "unknown-market", "path": "unknown-market.txt", "author": "Unseen writer (synthetic)", "work_id": "unknown-market", "genre": "vignette", "topic": "market", "split": "test"}
+  ]
+}

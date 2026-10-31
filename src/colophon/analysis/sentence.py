@@ -6,13 +6,14 @@ import math
 from statistics import mean, median, stdev
 from typing import Any
 
+from colophon.analysis.context import lexical_tokens
 from colophon.models.features import SentenceFeatures
 
 
 def compute_sentence_stats(text: str, nlp: Any) -> SentenceFeatures:
     """Compute sentence length distribution statistics."""
     doc = nlp(text)
-    lengths = [len([t for t in sent if not t.is_space]) for sent in doc.sents]
+    lengths = [len(lexical_tokens(sent)) for sent in doc.sents if lexical_tokens(sent)]
 
     if not lengths:
         return SentenceFeatures(

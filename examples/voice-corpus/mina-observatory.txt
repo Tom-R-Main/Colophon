@@ -1,0 +1,5 @@
+The instrument room occupies the northern end of the observatory, where a narrow passage separates the telescope controls from the insulated cabinet that contains the timing apparatus.
+
+Measurements begin after the enclosure reaches a stable temperature, a process that typically takes forty minutes and limits the number of observations possible during a short winter evening. Small fluctuations remain visible in the records even after this interval has elapsed.
+
+The resulting series describes both the intended experiment and the practical constraints under which the experiment was conducted, allowing later readers to distinguish an instrument adjustment from an unexpected astronomical event.

@@ -21,13 +21,28 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+          cache-dependency-path: requirements-dev.lock
       - name: Install
-        run: python -m pip install -e ".[stylize]" pytest ruff pyright build
+        run: |
+          python -m pip install -r requirements-dev.lock build
+          python -m pip install -e . --no-deps
+          python -m spacy download en_core_web_sm
       - name: Lint
-        run: ruff check src tests
+        run: ruff check src/ tests/ scripts/check_publication.py
       - name: Type check
-        run: pyright src/colophon/stylize/providers tests
+        run: pyright src/ tests/ scripts/check_publication.py
+      - name: Check publication boundary
+        run: python scripts/check_publication.py --tracked
       - name: Test
         run: pytest
       - name: Build package
         run: python -m build
+      - name: Exercise the public voice commands
+        run: |
+          colophon doctor
+          colophon corpus validate examples/voice-corpus/corpus.json
+          colophon voice extract examples/voice-corpus/corpus.json --author "Rowan (synthetic)" -o /tmp/rowan.voice.json
+          colophon voice export /tmp/rowan.voice.json -o /tmp/rowan.voice.md
+          colophon voice prompt /tmp/rowan.voice.json --task generate --mode exemplars -o /tmp/rowan.prompt.txt --receipt
+          colophon voice evaluate examples/voice-corpus/corpus.json -o /tmp/retrieval.json
+          colophon voice evaluate-writing examples/voice-corpus/writing-cases.json -o /tmp/writing.json

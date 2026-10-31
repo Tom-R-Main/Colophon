@@ -32,13 +32,24 @@ class OpenAIProvider:
         )
         response.raise_for_status()
         data = response.json()
+        details = data.get("incomplete_details") or {}
+        if details.get("reason") == "max_output_tokens":
+            raise RuntimeError("The model output was truncated; no complete rewrite was returned")
+        if data.get("status") != "completed":
+            raise RuntimeError("The provider returned an incomplete or unsuccessful response")
+        if any(
+            item.get("type") == "message" and item.get("status") != "completed"
+            for item in data.get("output", [])
+        ):
+            raise RuntimeError("The provider returned an incomplete output message")
         output_text = [
             content["text"]
             for item in data.get("output", [])
             if item.get("type") == "message"
             for content in item.get("content", [])
-            if content.get("type") == "output_text" and content.get("text")
+            if content.get("type") == "output_text" and isinstance(content.get("text"), str)
         ]
-        if not output_text:
-            raise ValueError("OpenAI response did not contain output text")
-        return "\n".join(output_text)
+        text = "".join(output_text)
+        if not text.strip():
+            raise RuntimeError("The provider returned no text")
+        return text

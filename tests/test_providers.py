@@ -5,6 +5,7 @@ from typing import Any
 import pytest
 
 from colophon.stylize.providers import PROVIDERS
+from colophon.stylize.providers.anthropic import AnthropicProvider
 from colophon.stylize.providers.gemini import GeminiProvider
 from colophon.stylize.providers.openai import OpenAIProvider
 from colophon.stylize.providers.openrouter import OpenRouterProvider
@@ -28,6 +29,29 @@ def test_provider_registry_uses_current_models() -> None:
     assert PROVIDERS["GEMINI_API_KEY"][2] == "gemini-3.6-flash"
 
 
+def test_anthropic_preserves_current_model_and_request(monkeypatch: pytest.MonkeyPatch) -> None:
+    from types import SimpleNamespace
+
+    import anthropic
+
+    request: dict[str, Any] = {}
+
+    def fake_create(**kwargs: Any) -> SimpleNamespace:
+        request.update(kwargs)
+        return SimpleNamespace(stop_reason="end_turn", content=[SimpleNamespace(type="text", text="styled")])
+
+    monkeypatch.setattr(
+        anthropic, "Anthropic", lambda **kwargs: SimpleNamespace(messages=SimpleNamespace(create=fake_create))
+    )
+    assert AnthropicProvider(api_key="test-key").generate("system", "user") == "styled"
+    assert request == {
+        "model": "claude-sonnet-5",
+        "max_tokens": 4096,
+        "system": "system",
+        "messages": [{"role": "user", "content": "user"}],
+    }
+
+
 def test_openai_uses_responses_api(monkeypatch: pytest.MonkeyPatch) -> None:
     request: dict[str, Any] = {}
 
@@ -35,11 +59,13 @@ def test_openai_uses_responses_api(monkeypatch: pytest.MonkeyPatch) -> None:
         request.update(url=url, **kwargs)
         return FakeResponse(
             {
+                "status": "completed",
                 "output": [
                     {
                         "type": "message",
+                        "status": "completed",
                         "content": [
-                            {"type": "output_text", "text": "first"},
+                            {"type": "output_text", "text": "first\n"},
                             {"type": "output_text", "text": "second"},
                         ],
                     }
@@ -66,10 +92,10 @@ def test_openai_uses_responses_api(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_openai_rejects_response_without_output_text(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "colophon.stylize.providers.openai.httpx.post",
-        lambda *args, **kwargs: FakeResponse({"output": []}),
+        lambda *args, **kwargs: FakeResponse({"status": "completed", "output": []}),
     )
 
-    with pytest.raises(ValueError, match="did not contain output text"):
+    with pytest.raises(RuntimeError, match="no text"):
         OpenAIProvider(api_key="test-key").generate("system", "user")
 
 
@@ -78,7 +104,7 @@ def test_openrouter_keeps_chat_completions_compatibility(monkeypatch: pytest.Mon
 
     def fake_post(url: str, **kwargs: Any) -> FakeResponse:
         request.update(url=url, **kwargs)
-        return FakeResponse({"choices": [{"message": {"content": "styled"}}]})
+        return FakeResponse({"choices": [{"finish_reason": "stop", "message": {"content": "styled"}}]})
 
     monkeypatch.setattr("colophon.stylize.providers.openrouter.httpx.post", fake_post)
 
@@ -91,6 +117,7 @@ def test_openrouter_keeps_chat_completions_compatibility(monkeypatch: pytest.Mon
         {"role": "system", "content": "system"},
         {"role": "user", "content": "user"},
     ]
+    assert request["json"]["max_tokens"] == 4096
     assert "temperature" not in request["json"]
 
 
@@ -101,7 +128,7 @@ def test_gemini_uses_current_model_without_deprecated_sampling(
 
     def fake_post(url: str, **kwargs: Any) -> FakeResponse:
         request.update(url=url, **kwargs)
-        return FakeResponse({"candidates": [{"content": {"parts": [{"text": "styled"}]}}]})
+        return FakeResponse({"candidates": [{"finishReason": "STOP", "content": {"parts": [{"text": "styled"}]}}]})
 
     monkeypatch.setattr("colophon.stylize.providers.gemini.httpx.post", fake_post)
 

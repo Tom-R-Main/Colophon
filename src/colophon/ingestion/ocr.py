@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import importlib
 import tempfile
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from pathlib import Path
 def ocr_pdf(path: Path) -> Path:
     """Run OCR on a scanned PDF and return the path to the OCR'd version."""
     try:
-        import ocrmypdf
+        ocrmypdf = importlib.import_module("ocrmypdf")
     except ImportError:
         raise RuntimeError(
             "OCR support requires ocrmypdf. Install it with:\n"

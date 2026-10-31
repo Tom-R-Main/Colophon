@@ -6,12 +6,19 @@ from typing import Optional
 import typer
 from rich.console import Console
 
+from colophon.voice.cli import app as voice_app
+from colophon.voice.cli import corpus_app, doctor
+
 app = typer.Typer(
     name="colophon",
     help="Stylometric and linguistic pattern analysis CLI.",
     no_args_is_help=True,
 )
 console = Console()
+
+app.add_typer(voice_app, name="voice")
+app.add_typer(corpus_app, name="corpus")
+app.command("doctor")(doctor)
 
 
 @app.command()
@@ -252,7 +259,7 @@ def index(
     # Store
     session = get_session(db)
     try:
-        row = index_profile(session, profile, classical_vector, author=author, lang=lang)
+        row = index_profile(session, profile, classical_vector, author=author, lang=profile.language or lang)
         console.print(f"[green]Indexed:[/green] {profile.document_title}")
         console.print(f"  Author: {author}")
         console.print(f"  Vector: {len(classical_vector)} dims")
@@ -300,7 +307,7 @@ def search_style(
     session = get_session(db)
     try:
         # Search by author
-        author_results = search_authors(session, vector, limit=top)
+        author_results = search_authors(session, vector, limit=top, lang=profile.language or lang)
         if author_results:
             table = Table(title="Most Similar Authors")
             table.add_column("Rank", justify="right", style="bold")
@@ -312,7 +319,7 @@ def search_style(
             console.print(table)
 
         # Search by document
-        doc_results = search_similar(session, vector, limit=top)
+        doc_results = search_similar(session, vector, limit=top, lang=profile.language or lang)
         if doc_results:
             table = Table(title="Most Similar Documents")
             table.add_column("Rank", justify="right", style="bold")

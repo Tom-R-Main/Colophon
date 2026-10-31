@@ -23,7 +23,7 @@ def generate_report(profile: StyleProfile, output: Path, *, standalone: bool = F
 
     # Load template
     template_text = resources.files("colophon.reporting.templates").joinpath("report.html").read_text()
-    template = Template(template_text)
+    template = Template(template_text, autoescape=True)
 
     ngram_items = list(profile.ngrams.word_bigrams.items())[:20] if profile.ngrams else []
 
@@ -157,8 +157,9 @@ def _function_word_chart(profile: StyleProfile, plotly_js: bool | str) -> str:
         return ""
 
     # Reverse for horizontal bar chart (top at top)
-    words = list(reversed(list(fw.frequencies.keys())))
-    freqs = list(reversed(list(fw.frequencies.values())))
+    ranked = sorted(fw.frequencies.items(), key=lambda item: (-item[1], item[0]))[:fw.top_n]
+    words = [word for word, _ in reversed(ranked)]
+    freqs = [value for _, value in reversed(ranked)]
 
     fig = go.Figure(go.Bar(
         y=words,

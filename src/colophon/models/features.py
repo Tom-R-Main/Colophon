@@ -40,7 +40,7 @@ class VocabularyFeatures(BaseModel):
     hapax_legomena: int = Field(description="Words appearing exactly once.")
     hapax_ratio: float
     yules_k: float = Field(description="Yule's K — vocabulary richness, length-independent.")
-    honores_r: float | None = Field(None, description="Honore's R — rewards hapax legomena. None if V1 == V.")
+    honores_r: float | None = Field(default=None, description="Honore's R — rewards hapax legomena. None if V1 == V.")
 
 
 class FunctionWordFeatures(BaseModel):
@@ -74,7 +74,7 @@ class PunctuationFeatures(BaseModel):
     period: float = 0.0
     semicolon: float = 0.0
     colon: float = 0.0
-    dash: float = Field(0.0, description="Em-dash and double-dash combined.")
+    dash: float = Field(default=0.0, description="Em-dash and double-dash combined.")
     exclamation: float = 0.0
     question: float = 0.0
     ellipsis: float = 0.0
@@ -136,6 +136,17 @@ class StyleProfile(BaseModel):
     segment_id: int | None = None
     computed_at: datetime = Field(default_factory=datetime.now)
     word_count: int = 0
+    schema_version: str = "legacy-1"
+    analyzer_version: str = "unknown"
+    language: str | None = None
+    spacy_model: str | None = None
+    spacy_version: str | None = None
+    model_version: str | None = None
+    normalization_version: str = "unknown"
+    vector_schema: str | None = None
+    source_hash: str | None = None
+    availability: dict[str, str] = Field(default_factory=dict)
+    warnings: list[str] = Field(default_factory=list)
 
     readability: ReadabilityFeatures | None = None
     sentences: SentenceFeatures | None = None
