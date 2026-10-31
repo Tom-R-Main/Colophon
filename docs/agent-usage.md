@@ -37,6 +37,8 @@ The default registry is `$XDG_CONFIG_HOME/colophon/profiles.json`, or `~/.config
 
 Registry and profile files may live outside Git checkouts or in untracked, Git-ignored locations such as this project's `outputs/`. Tracked and nonignored files are refused, including paths reached through symlinks. Keep prompt exports private too: they can include source passages. This is a Git publication boundary, not a claim about filesystem encryption or publication rights.
 
+Adapters must preserve the supplied absolute registry path when calling Colophon. Do not resolve or simplify symlinks first: native validation checks every encountered link, including an intermediate link inside a checkout, before following it. Collapsing the path in a wrapper would hide those locations. Consumers may use the canonical `profile_path` returned after successful resolution and must still compare the export receipt with its selected identity.
+
 If file access, Git metadata or safe file-open support cannot be verified, discovery returns `privacy_check_failed`. Check the reported environment and access rather than disabling the checks. The current integration checks exercise macOS and Linux; this is not a claim of qualified Windows registry support.
 
 ```bash

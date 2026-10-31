@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import subprocess
 from pathlib import Path
 
@@ -322,3 +323,181 @@ def test_missing_safe_open_capability_is_typed_and_closed(tmp_path, monkeypatch,
     path = configure(tmp_path / "registry.json", {})
     monkeypatch.delattr(api.os, flag)
     assert_code("privacy_check_failed", api.list_profiles, path)
+
+
+@pytest.mark.parametrize("kind", ["registry", "profile"])
+@pytest.mark.parametrize("link_kind", ["file", "directory"])
+@pytest.mark.parametrize("relative", [False, True])
+def test_external_chain_cannot_skip_tracked_intermediate_link(repo, tmp_path, profile_data, kind, link_kind, relative):
+    private = tmp_path / "private"
+    private.mkdir()
+    source = private / "writer.json"
+    source.write_text(json.dumps(profile_data))
+    registry = configure(private / "registry.json", {"voice": source})
+    selected = registry if kind == "registry" else source
+    target = private if link_kind == "directory" else selected
+    middle = repo / "middle"
+    middle.symlink_to(
+        os.path.relpath(target, repo) if relative else target, target_is_directory=link_kind == "directory"
+    )
+    git(repo, "add", "middle")
+    outer = tmp_path / "outer"
+    outer.symlink_to(
+        os.path.relpath(middle, tmp_path) if relative else middle, target_is_directory=link_kind == "directory"
+    )
+    direct = middle / selected.name if link_kind == "directory" else middle
+    chained = outer / selected.name if link_kind == "directory" else outer
+    if kind == "registry":
+        assert_code("registry_not_private", api.list_profiles, direct)
+        assert_code("registry_not_private", api.list_profiles, chained)
+    else:
+        configure(registry, {"voice": direct})
+        assert_code("profile_not_private", api.resolve_profile, "voice", registry)
+        configure(registry, {"voice": chained})
+        assert_code("profile_not_private", api.resolve_profile, "voice", registry)
+
+
+@pytest.mark.parametrize("kind", ["registry", "profile"])
+@pytest.mark.parametrize("link_kind", ["file", "directory"])
+@pytest.mark.parametrize("ignored", [False, True])
+def test_intermediate_link_must_be_ignored_when_untracked(repo, tmp_path, profile_data, kind, link_kind, ignored):
+    private = tmp_path / "private"
+    private.mkdir()
+    source = private / "writer.json"
+    source.write_text(json.dumps(profile_data))
+    registry = configure(private / "registry.json", {"voice": source})
+    selected = registry if kind == "registry" else source
+    middle = repo / "middle"
+    middle.symlink_to(private if link_kind == "directory" else selected, target_is_directory=link_kind == "directory")
+    if ignored:
+        (repo / ".gitignore").write_text("middle\n")
+    outer = tmp_path / "outer"
+    outer.symlink_to(middle, target_is_directory=link_kind == "directory")
+    chained = outer / selected.name if link_kind == "directory" else outer
+    if kind == "registry":
+        function, arguments = api.list_profiles, [chained]
+    else:
+        configure(registry, {"voice": chained})
+        function, arguments = api.resolve_profile, ["voice", registry]
+    if ignored:
+        assert function(*arguments)["status"] == ("configured" if kind == "registry" else "resolved")
+    else:
+        assert_code(f"{kind}_not_private", function, *arguments)
+
+
+@pytest.mark.parametrize("kind", ["registry", "profile"])
+def test_parent_components_follow_preceding_symlink_semantics(tmp_path, profile_data, kind):
+    lexical = tmp_path / "lexical"
+    lexical.mkdir()
+    physical = tmp_path / "physical"
+    physical.mkdir()
+    (physical / "child").mkdir()
+    (lexical / "redirect").symlink_to(physical / "child", target_is_directory=True)
+    for root in (lexical, physical):
+        (root / "private").mkdir()
+    source = physical / "private" / "writer.json"
+    source.write_text(json.dumps(profile_data))
+    registry = configure(physical / "private" / "registry.json", {"voice": source})
+    configure(lexical / "private" / "registry.json", {"decoy": source})
+    (lexical / "private" / "writer.json").write_text(SENTINEL)
+    selected = registry if kind == "registry" else source
+    outer = tmp_path / "outer"
+    outer.symlink_to(f"lexical/redirect/../private/{selected.name}")
+    if kind == "registry":
+        assert api.list_profiles(outer)["profiles"] == [{"name": "voice", "kind": "VoiceProfile"}]
+    else:
+        configure(registry, {"voice": outer})
+        assert api.resolve_profile("voice", registry)["profile_path"] == str(source)
+
+
+@pytest.mark.parametrize("kind", ["registry", "profile"])
+def test_intermediate_git_metadata_detour_cannot_collapse_away(repo, tmp_path, profile_data, kind):
+    private = tmp_path / "private"
+    private.mkdir()
+    source = private / "writer.json"
+    source.write_text(json.dumps(profile_data))
+    registry = configure(private / "registry.json", {"voice": source})
+    selected = registry if kind == "registry" else source
+    (repo / ".git" / "escape").symlink_to(private, target_is_directory=True)
+    outer = tmp_path / "outer"
+    outer.symlink_to(repo / ".git" / "escape" / selected.name)
+    if kind == "registry":
+        assert_code("registry_not_private", api.list_profiles, outer)
+    else:
+        configure(registry, {"voice": outer})
+        assert_code("profile_not_private", api.resolve_profile, "voice", registry)
+
+
+@pytest.mark.parametrize("kind", ["registry", "profile"])
+@pytest.mark.parametrize("mode", ["loop", "missing", "permission"])
+def test_chain_failures_are_typed_and_do_not_open_source(tmp_path, profile_data, monkeypatch, kind, mode):
+    source = tmp_path / "writer.json"
+    source.write_text(json.dumps(profile_data))
+    registry = configure(tmp_path / "registry.json", {"voice": source})
+    selected = registry if kind == "registry" else source
+    middle = tmp_path / "middle"
+    outer = tmp_path / "outer"
+    outer.symlink_to(middle)
+    middle.symlink_to(outer if mode == "loop" else tmp_path / "missing" if mode == "missing" else selected)
+    if kind == "profile":
+        configure(registry, {"voice": outer})
+    if mode == "permission":
+        original = Path.lstat
+
+        def lstat(path, *args, **kwargs):
+            if path == middle:
+                raise PermissionError(SENTINEL)
+            return original(path, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "lstat", lstat)
+    original_open = api.os.open
+    opened = []
+
+    def open_file(path, *args, **kwargs):
+        opened.append(Path(path))
+        return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(api.os, "open", open_file)
+    function, arguments = (
+        (api.list_profiles, [outer]) if kind == "registry" else (api.resolve_profile, ["voice", registry])
+    )
+    if mode == "missing" and kind == "registry":
+        assert function(*arguments)["status"] == "not_configured"
+    else:
+        expected = "profile_not_found" if mode == "missing" else "privacy_check_failed"
+        assert_code(expected, function, *arguments)
+    assert selected not in opened
+
+
+def test_component_traversal_has_explicit_link_budget(tmp_path):
+    target = tmp_path / "target"
+    target.write_text(SENTINEL)
+    current = target
+    for index in range(41):
+        link = tmp_path / f"link-{index}"
+        link.symlink_to(current)
+        current = link
+    assert_code("privacy_check_failed", api._private_path, current, "profile_not_private")
+
+
+@pytest.mark.parametrize("kind", ["registry", "profile"])
+def test_intermediate_link_checks_outer_and_nested_git_metadata(repo, tmp_path, profile_data, kind):
+    source = tmp_path / "writer.json"
+    source.write_text(json.dumps(profile_data))
+    registry = configure(tmp_path / "registry.json", {"voice": source})
+    selected = registry if kind == "registry" else source
+    nested = repo / "nested"
+    nested.mkdir()
+    middle = nested / "middle"
+    middle.symlink_to(selected)
+    git(repo, "add", "nested/middle")
+    git(nested, "init")
+    git(nested, "config", "core.excludesFile", "")
+    (nested / ".gitignore").write_text("middle\n")
+    outer = tmp_path / "outer"
+    outer.symlink_to(middle)
+    if kind == "registry":
+        assert_code("registry_not_private", api.list_profiles, outer)
+    else:
+        configure(registry, {"voice": outer})
+        assert_code("profile_not_private", api.resolve_profile, "voice", registry)

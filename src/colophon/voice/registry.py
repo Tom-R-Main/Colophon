@@ -12,6 +12,7 @@ import os
 import re
 import stat
 import subprocess
+from collections import deque
 from pathlib import Path
 from typing import Any
 
@@ -131,19 +132,40 @@ def _private_path(path: Path, code: str) -> Path:
     try:
         if any(part.casefold() == ".git" for part in path.parts):
             raise _error(code)
-        # Intermediate symlinks also have local identities. Checking each link
-        # prevents a tracked parent link or a .git detour from hiding behind the
-        # final resolved target's location.
-        for component in reversed((path, *path.parents)):
-            if component.is_symlink():
+        # Resolve one component and one link at a time. Path.resolve() collapses
+        # entire chains, hiding intermediate links that may themselves be tracked.
+        # Keep '..' pending until all preceding symlinks have been honored.
+        pending = deque(path.parts[1:])
+        resolved = Path(path.anchor)
+        links = 0
+        while pending:
+            part = pending.popleft()
+            if part == "..":
+                resolved = resolved.parent
+                continue
+            if part.casefold() == ".git":
+                raise _error(code)
+            component = resolved / part
+            if stat.S_ISLNK(component.lstat().st_mode):
                 _check_location(component, code)
-                _check_location(component.resolve(), code)
+                links += 1
+                if links > 40:
+                    raise _error("privacy_check_failed")
+                target = component.readlink()
+                if target.is_absolute():
+                    resolved = Path(target.anchor)
+                    pending.extendleft(reversed(target.parts[1:]))
+                else:
+                    pending.extendleft(reversed(target.parts))
+            else:
+                resolved = component
         _check_location(path, code)
-        resolved = path.resolve()
         _check_location(resolved, code)
         return resolved
     except RegistryError:
         raise
+    except FileNotFoundError:
+        raise _error(code.removesuffix("_not_private") + "_not_found") from None
     except (OSError, RuntimeError, ValueError):
         raise _error("privacy_check_failed") from None
 
